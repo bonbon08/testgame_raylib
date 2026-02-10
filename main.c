@@ -2,20 +2,30 @@
 
 int main(void)
 {
-    const int screenWidth = 800;
-    const int screenHeight = 450;
+    const int screenWidth = 1080;
+    const int screenHeight = 720;
 
-    InitWindow(screenWidth, screenHeight, "Mein erstes Raylib Spiel");
+    InitWindow(screenWidth, screenHeight, "Jumper Chicken");
 
+    Vector2 chickenPosition = { (float)screenWidth/2, (float)screenHeight/2 };
+    int Jumpframes = 0;
     SetTargetFPS(60);
 
     while (!WindowShouldClose())
-    {
+    {   
+        if (IsKeyDown(KEY_X)) {
+            Jumpframes = 10;
+        };
+
+        if (Jumpframes >= 1) {
+            chickenPosition.y -= 5.0f;
+            Jumpframes -= 1;
+        } else {
+            chickenPosition.y += 5.0f;
+        };
         BeginDrawing();
         ClearBackground(RAYWHITE);
-
-        DrawText("Hallo Raylib!", 190, 200, 20, LIGHTGRAY);
-
+        DrawCircleV(chickenPosition, 30.0f, MAROON);
         EndDrawing();
     }
 
