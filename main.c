@@ -55,11 +55,15 @@ int main(void)
         }
 
         if (jumpFrames > 0) {
-            chickenPosition.y -= 5.0f;
+            chickenPosition.y -= 8.0f;
             jumpFrames--;
         } else {
-            chickenPosition.y += 3.0f;
+            chickenPosition.y += 6.0f;
         }
+        if (chickenPosition.x >= (screenWidth-64)) chickendirection = 2;
+        if (chickenPosition.x <= 0) chickendirection = 0;
+        if (chickendirection == 0) chickenPosition.x += 8;
+        if (chickendirection == 2) chickenPosition.x -= 8;
 
         BeginDrawing();
         ClearBackground(RAYWHITE);
