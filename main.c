@@ -1,10 +1,20 @@
 #include "raylib.h"
+#include <stdlib.h>
+#include <time.h>
 
 #define NUM_TEXTURES 4
+#define NUM_SPIKES 5
+
+typedef struct Spike {
+    Vector2 pos;
+    bool active;
+} Spike;
+
 int main(void)
 {
     const int screenWidth = 1080;
     const int screenHeight = 720;
+    srand(time(NULL));
 
     InitWindow(screenWidth, screenHeight, "Jumper Chicken");
     Image chickenImage1r = LoadImage("Chicken.png");
@@ -29,10 +39,24 @@ int main(void)
     chickentextures[1] = LoadTextureFromImage(chickenImage2r);
     chickentextures[2] = LoadTextureFromImage(chickenImage1l);
     chickentextures[3] = LoadTextureFromImage(chickenImage2l);
+    
     UnloadImage(chickenImage1r); 
     UnloadImage(chickenImage2r); 
     UnloadImage(chickenImage1l); 
     UnloadImage(chickenImage2l); 
+
+        // --- Spike Sprites ---
+    Image spikel = LoadImage("Spike.png");
+    ImageResize(&spikel, 64, 64);
+    ImageRotate(&spikel, -45);
+    Texture2D spikeltexture = LoadTextureFromImage(spikel);
+    UnloadImage(spikel);
+
+    Image spiker = LoadImage("Spike.png");
+    ImageResize(&spiker, 64, 64);
+    ImageRotate(&spiker, -225);
+    Texture2D spikertexture = LoadTextureFromImage(spiker);
+    UnloadImage(spiker);
 
 
 
