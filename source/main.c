@@ -4,12 +4,20 @@
 #include <switch.h>
 
 #define NUM_TEXTURES 4
-#define NUM_SPIKES 5   
+#define NUM_COINS 5
+
+typedef struct Coin {
+    Vector2 pos;
+    bool active;
+} Coin;
+
+Coin coins[NUM_COINS];   
 #define SLOT_HEIGHT 64 
 #define CHICKEN_SIZE 64
 
 int score = 0;
 int highscore = 0;
+int coinScore = 0;
 bool startgame = false;
 
 typedef struct Spike {
@@ -41,6 +49,13 @@ void generateSpikes(int screenWidth, int screenHeight, bool activateLeft) {
         
         rspikes[i].pos = (Vector2){ (float)(screenWidth - 64), (float)(allSlots[i] * SLOT_HEIGHT) };
         rspikes[i].active = !activateLeft;
+    }
+    
+    // Place coins between spike rows
+    for (int i = 0; i < NUM_COINS; i++) {
+        int coinSlot = rand() % totalSlots;
+        coins[i].pos = (Vector2){ (float)(screenWidth + 64), (float)(allSlots[coinSlot] * SLOT_HEIGHT) };
+        coins[i].active = true;
     }
     
     free(allSlots);
@@ -101,6 +116,11 @@ int main(void)
 
     generateSpikes(screenWidth, screenHeight, false); 
     int frameCounter = 0;
+    
+    // Initialize coins
+    for (int i = 0; i < NUM_COINS; i++) {
+        coins[i].active = false;
+    }
 
     while (!WindowShouldClose())
     {
@@ -133,6 +153,17 @@ int main(void)
 
             Rectangle chickenRect = { chickenPosition.x + 8, chickenPosition.y + 8, CHICKEN_SIZE-(0.2*CHICKEN_SIZE), CHICKEN_SIZE-(0.2*CHICKEN_SIZE) };
             
+            // Coin collection
+            for (int i = 0; i < NUM_COINS; i++) {
+                if (coins[i].active) {
+                    Rectangle coinRect = { coins[i].pos.x - 8, coins[i].pos.y - 8, 16, 16 };
+                    if (CheckCollisionRecs(chickenRect, coinRect)) {
+                        coins[i].active = false;
+                        coinScore++;
+                    }
+                }
+            }
+            
             for (int i = 0; i < NUM_SPIKES; i++) {
                 Rectangle leftSpikeRect = { lspikes[i].pos.x, lspikes[i].pos.y + 20, 44, 24 };
                 Rectangle rightSpikeRect = { rspikes[i].pos.x + 20, rspikes[i].pos.y + 20, 44, 24 };
@@ -162,6 +193,13 @@ int main(void)
 
         BeginDrawing();
         ClearBackground(BLUE);
+
+        // Draw coins
+        for (int i = 0; i < NUM_COINS; i++) {
+            if (coins[i].active) {
+                DrawRectangleV(coins[i].pos, (Vector2){ 16, 16 }, YELLOW);
+            }
+        }
 
         for (int i = 0; i < NUM_SPIKES; i++) {
             
