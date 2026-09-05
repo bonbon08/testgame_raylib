@@ -1,49 +1,16 @@
 #include "raylib.h"
 #include <stdlib.h>
 #include <time.h>
+#include "objects.c"
 
-#define NUM_TEXTURES 4
-#define NUM_SPIKES 5   
-#define SLOT_HEIGHT 64 
 #define CHICKEN_SIZE 64
 
 int score = 0;
 int highscore = 0;
+int Coins = 0;
 bool startgame = false;
 
-typedef struct Spike {
-    Vector2 pos;
-    bool active;
-} Spike;
 
-Spike lspikes[NUM_SPIKES];
-Spike rspikes[NUM_SPIKES];
-
-void generateSpikes(int screenWidth, int screenHeight, bool activateLeft) {
-    const int totalSlots = screenHeight / SLOT_HEIGHT; 
-    
-    int *allSlots = (int *)malloc(totalSlots * sizeof(int));
-    for (int i = 0; i < totalSlots; i++) {
-        allSlots[i] = i;
-    }
-    
-    for (int i = totalSlots - 1; i > 0; i--) {
-        int j = rand() % (i + 1);
-        int temp = allSlots[i];
-        allSlots[i] = allSlots[j];
-        allSlots[j] = temp;
-    }
-    
-    for (int i = 0; i < NUM_SPIKES; i++) {
-        lspikes[i].pos = (Vector2){ 0, (float)(allSlots[i] * SLOT_HEIGHT) };
-        lspikes[i].active = activateLeft;
-        
-        rspikes[i].pos = (Vector2){ (float)(screenWidth - 64), (float)(allSlots[i] * SLOT_HEIGHT) };
-        rspikes[i].active = !activateLeft;
-    }
-    
-    free(allSlots);
-}
 
 int main(void)
 {
@@ -93,6 +60,10 @@ int main(void)
     ImageResize(&spiker, SLOT_HEIGHT, SLOT_HEIGHT);
     Texture2D spikertexture = LoadTextureFromImage(spiker);
     UnloadImage(spiker);
+
+    Image CoinImage = LoadImage("coin.png");
+    ImageResize(&CoinImage, 64, 64);
+    Texture2D Cointexture = LoadTextureFromImage(CoinImage);
 
     Vector2 chickenPosition = { screenWidth/2.0f, screenHeight/2.0f };
     int chickenspr = 0;
@@ -145,9 +116,17 @@ int main(void)
                     break;
                 }
             }
+            Rectangle coinRect = { maincoin.pos.x+12, maincoin.pos.y+4, 40, 56};
+            if (CheckCollisionRecs(chickenRect, coinRect)) {
+                generateCoin(screenWidth, screenHeight);
+                Coins += 1;
+                score += 100;
+            }
         } else if (!startgame) { 
             if (IsKeyPressed(KEY_X)) {
                 startgame = true;
+                generateCoin(screenWidth, screenHeight);
+
             }
         }else {
             if (IsKeyPressed(KEY_X)) {
@@ -173,6 +152,7 @@ int main(void)
         }
 
         if (!dead && startgame) {
+            DrawTextureEx(Cointexture, maincoin.pos, 0.0f, 1.0f, WHITE);
             DrawTexture(chickentextures[chickenspr + chickendirection],
                         (int)chickenPosition.x, (int)chickenPosition.y, WHITE);
         } else if (!startgame) {
@@ -183,6 +163,7 @@ int main(void)
             DrawText(TextFormat("Score: %d", score), screenWidth/4+140, (screenHeight/2)+70, 40, RED);
         }
         DrawText(TextFormat("Score: %d", score), 8, 8, 20, WHITE);
+        DrawText(TextFormat("Coins: %d", Coins), 8, 32, 20, YELLOW);
         EndDrawing();
     }
 
