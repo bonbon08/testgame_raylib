@@ -4,3 +4,10 @@ nSprite.aseprite
 Chicken.aseprite
 coin.aseprite
 spiel
+CMakeFiles
+CMakeCache.txt
+cmake_install.cmake
+CPackConfig.cmake
+CPackSourceConfig.cmake
+Makefile
+_deps

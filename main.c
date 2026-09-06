@@ -47,7 +47,7 @@ int main(void)
             
             for (int i = 0; i < NUM_SPIKES; i++) {
                 Rectangle leftSpikeRect = { lspikes[i].pos.x, lspikes[i].pos.y + 20, 44, 24 };
-                Rectangle rightSpikeRect = { rspikes[i].pos.x + 20, rspikes[i].pos.y + 20, 44, 24 };
+                Rectangle rightSpikeRect = { rspikes[i].pos.x -44, rspikes[i].pos.y + 20, 44, 24 };
                 
                 if ((lspikes[i].active && CheckCollisionRecs(chickenRect, leftSpikeRect)) ||
                     (rspikes[i].active && CheckCollisionRecs(chickenRect, rightSpikeRect))) {
@@ -87,9 +87,14 @@ int main(void)
             
             
             if (lspikes[i].active) DrawTextureEx(lspikes[i].spiketexture, lspikes[i].pos, 0.0f, 1.0f, WHITE);
-            if (rspikes[i].active) DrawTextureEx(lspikes[i].spiketexture, rspikes[i].pos, 0.0f, 1.0f, WHITE);
+            if (rspikes[i].active) {
+                    Vector2 rotatedPos = { 
+                    rspikes[i].pos.x , 
+                    rspikes[i].pos.y + SLOT_HEIGHT 
+                };
+                DrawTextureEx(lspikes[i].spiketexture, rotatedPos, 180.0f, 1.0f, WHITE);
+            }        
         }
-
         if (!Chicken.dead && Gamevars.startgame) {
             DrawTextureEx(maincoin.texture, maincoin.pos, 0.0f, 1.0f, WHITE);
             DrawTexture(Chicken.textures[Chicken.spr + Chicken.direction],
@@ -107,8 +112,8 @@ int main(void)
     }
 
     for (int i = 0; i < NUM_TEXTURES; i++) UnloadTexture(Chicken.textures[i]);
-    for (int i = 0; i < NUM_SPIKES; i++) UnloadTexture(lspikes[i].spiketexture);
-    for (int i = 0; i < NUM_SPIKES; i++) UnloadTexture(rspikes[i].spiketexture);
+    UnloadTexture(spikeLeftTex);
+    UnloadTexture(spikeRightTex);
     CloseWindow();
     
     return 0;

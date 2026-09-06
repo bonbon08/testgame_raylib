@@ -74,32 +74,33 @@ void generateSpikes(int screenWidth, int screenHeight, bool activateLeft) {
         lspikes[i].pos = (Vector2){ 0, (float)(allSlots[i] * SLOT_HEIGHT) };
         lspikes[i].active = activateLeft;
         
-        rspikes[i].pos = (Vector2){ (float)(screenWidth - 64), (float)(allSlots[i] * SLOT_HEIGHT) };
+        rspikes[i].pos = (Vector2){ (float)(screenWidth), (float)(allSlots[i] * SLOT_HEIGHT) };
         rspikes[i].active = !activateLeft;
     }
     
     free(allSlots);
 }
 
+// Globale Textur-Variablen (oder in main)
+Texture2D spikeLeftTex;
+Texture2D spikeRightTex;
+
 void InitSpikes(int screenWidth, int screenHeight) {
     Image spikel = LoadImage("nSpike.png");
-    ImageRotate(&spikel, 0);
     ImageResize(&spikel, SLOT_HEIGHT, SLOT_HEIGHT);  
-    Texture2D spr;
-    spr = LoadTextureFromImage(spikel);
-    for (int i=0; i<NUM_SPIKES; i++){
-        lspikes[i].spiketexture = spr;
-    }
+    spikeLeftTex = LoadTextureFromImage(spikel);
     UnloadImage(spikel);
 
     Image spiker = LoadImage("nSpike.png");
-    ImageRotate(&spiker, 180);
     ImageResize(&spiker, SLOT_HEIGHT, SLOT_HEIGHT);
-    spr = LoadTextureFromImage(spiker);
-    for (int i=0; i<NUM_SPIKES; i++){
-        rspikes[i].spiketexture = spr;
-    }
+    spikeRightTex = LoadTextureFromImage(spiker);
     UnloadImage(spiker);
+
+    for (int i = 0; i < NUM_SPIKES; i++){
+        lspikes[i].spiketexture = spikeLeftTex;
+        rspikes[i].spiketexture = spikeRightTex;
+    }
+
     generateSpikes(screenWidth, screenHeight, false);
 }
 
