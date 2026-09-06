@@ -52,6 +52,9 @@ int main(void)
                 if ((lspikes[i].active && CheckCollisionRecs(chickenRect, leftSpikeRect)) ||
                     (rspikes[i].active && CheckCollisionRecs(chickenRect, rightSpikeRect))) {
                     Chicken.dead = true;
+                    if (Gamevars.highscore<Gamevars.score) {Gamevars.highscore=Gamevars.score;}
+                    write_values(0, Gamevars.highscore);
+                    write_values(1, Gamevars.Coins);
                     break;
                 }
             }
@@ -70,7 +73,6 @@ int main(void)
         }else {
             if (IsKeyPressed(KEY_X)) {
                 Chicken.dead = false;
-                if (Gamevars.highscore<Gamevars.score) {Gamevars.highscore=Gamevars.score;}
                 Gamevars.score = 0;
                 Chicken.pos = (Vector2){ Gamevars.screenWidth/2.0f, Gamevars.screenHeight/2.0f };
                 Chicken.velocityY = 0;
@@ -114,6 +116,7 @@ int main(void)
     for (int i = 0; i < NUM_TEXTURES; i++) UnloadTexture(Chicken.textures[i]);
     UnloadTexture(spikeLeftTex);
     UnloadTexture(spikeRightTex);
+    UnloadTexture(maincoin.texture);
     CloseWindow();
     
     return 0;

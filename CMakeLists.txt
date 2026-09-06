@@ -13,5 +13,5 @@ FetchContent_Declare(
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(raylib)
 
-add_executable(spiel main.c)
+add_executable(spiel src/main.c)
 target_link_libraries(spiel PRIVATE raylib)

@@ -1,5 +1,6 @@
 #include "raylib.h"
 #include <stdlib.h>
+#include "Filerw.c"
 
 #define NUM_TEXTURES 4
 #define NUM_SPIKES 5   
@@ -46,8 +47,8 @@ Gamelogik Gamevars;
 
 void Initgamevars() {
     Gamevars.score = 0;
-    Gamevars.highscore = 0;
-    Gamevars.Coins = 0;
+    Gamevars.highscore = read_values(0);
+    Gamevars.Coins = read_values(1);
     Gamevars.startgame = false;
     Gamevars.frameCounter = 0;
     Gamevars.screenWidth = 1080;
@@ -81,17 +82,16 @@ void generateSpikes(int screenWidth, int screenHeight, bool activateLeft) {
     free(allSlots);
 }
 
-// Globale Textur-Variablen (oder in main)
 Texture2D spikeLeftTex;
 Texture2D spikeRightTex;
 
 void InitSpikes(int screenWidth, int screenHeight) {
-    Image spikel = LoadImage("nSpike.png");
+    Image spikel = LoadImage("data/nSpike.png");
     ImageResize(&spikel, SLOT_HEIGHT, SLOT_HEIGHT);  
     spikeLeftTex = LoadTextureFromImage(spikel);
     UnloadImage(spikel);
 
-    Image spiker = LoadImage("nSpike.png");
+    Image spiker = LoadImage("data/nSpike.png");
     ImageResize(&spiker, SLOT_HEIGHT, SLOT_HEIGHT);
     spikeRightTex = LoadTextureFromImage(spiker);
     UnloadImage(spiker);
@@ -113,32 +113,32 @@ void generateCoin(int screenWidth, int screenHeight) {
 }
 
 void InitCoin() {
-    Image CoinImage = LoadImage("coin.png");
+    Image CoinImage = LoadImage("data/coin.png");
     ImageResize(&CoinImage, 64, 64);
     maincoin.texture = LoadTextureFromImage(CoinImage);
 }
 
 void Initplayer(int screenWidth, int screenHeight){
-    Image chickenImage1r = LoadImage("Chicken.png");
+    Image chickenImage1r = LoadImage("data/Chicken.png");
     ImageResize(&chickenImage1r, CHICKEN_SIZE, CHICKEN_SIZE);
     ImageRotate(&chickenImage1r, -20);
     Chicken.textures[0] = LoadTextureFromImage(chickenImage1r);
     UnloadImage(chickenImage1r); 
 
-    Image chickenImage2r = LoadImage("Chicken.png");
+    Image chickenImage2r = LoadImage("data/Chicken.png");
     ImageResize(&chickenImage2r, CHICKEN_SIZE, CHICKEN_SIZE);
     ImageRotate(&chickenImage2r, 20);
     Chicken.textures[1] = LoadTextureFromImage(chickenImage2r);
     UnloadImage(chickenImage2r); 
 
-    Image chickenImage1l = LoadImage("Chicken.png");
+    Image chickenImage1l = LoadImage("data/Chicken.png");
     ImageResize(&chickenImage1l, CHICKEN_SIZE, CHICKEN_SIZE);
     ImageRotate(&chickenImage1l, -20);
     ImageFlipHorizontal(&chickenImage1l);
     Chicken.textures[2] = LoadTextureFromImage(chickenImage1l);
     UnloadImage(chickenImage1l); 
 
-    Image chickenImage2l = LoadImage("Chicken.png");
+    Image chickenImage2l = LoadImage("data/Chicken.png");
     ImageResize(&chickenImage2l, CHICKEN_SIZE, CHICKEN_SIZE);
     ImageRotate(&chickenImage2l, 20);
     ImageFlipHorizontal(&chickenImage2l);

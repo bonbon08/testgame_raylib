@@ -11,3 +11,6 @@ CPackConfig.cmake
 CPackSourceConfig.cmake
 Makefile
 _deps
+.vscode/settings.json
+hscore.txt
+coins.txt
