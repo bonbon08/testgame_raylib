@@ -3,108 +3,47 @@
 #include <time.h>
 #include "objects.c"
 
-#define CHICKEN_SIZE 64
-
-int score = 0;
-int highscore = 0;
-int Coins = 0;
-bool startgame = false;
-
-
 
 int main(void)
 {
-    const int screenWidth = 1080;
-    const int screenHeight = 720;
-
-    InitWindow(screenWidth, screenHeight, "Jumper Chicken");
+    Initgamevars();
+    InitWindow(Gamevars.screenWidth, Gamevars.screenHeight, "Jumper Chicken");
     SetTargetFPS(60);
     srand(time(NULL));
 
-    Image chickenImage1r = LoadImage("Chicken.png");
-    ImageResize(&chickenImage1r, CHICKEN_SIZE, CHICKEN_SIZE);
-    Image chickenImage2r = LoadImage("Chicken.png");
-    ImageResize(&chickenImage2r, CHICKEN_SIZE, CHICKEN_SIZE);
-    ImageRotate(&chickenImage1r, -20);
-    ImageRotate(&chickenImage2r, 20);
-
-    Image chickenImage1l = LoadImage("Chicken.png");
-    ImageResize(&chickenImage1l, CHICKEN_SIZE, CHICKEN_SIZE);
-    Image chickenImage2l = LoadImage("Chicken.png");
-    ImageResize(&chickenImage2l, CHICKEN_SIZE, CHICKEN_SIZE);
-    ImageRotate(&chickenImage1l, -20);
-    ImageRotate(&chickenImage2l, 20);
-    ImageFlipHorizontal(&chickenImage1l);
-    ImageFlipHorizontal(&chickenImage2l);
-
-    Texture2D chickentextures[NUM_TEXTURES] = {
-        LoadTextureFromImage(chickenImage1r),
-        LoadTextureFromImage(chickenImage2r),
-        LoadTextureFromImage(chickenImage1l),
-        LoadTextureFromImage(chickenImage2l)
-    };
-
-    UnloadImage(chickenImage1r); 
-    UnloadImage(chickenImage2r); 
-    UnloadImage(chickenImage1l); 
-    UnloadImage(chickenImage2l); 
-
-    Image spikel = LoadImage("nSpike.png");
-    ImageRotate(&spikel, 0);
-    ImageResize(&spikel, SLOT_HEIGHT, SLOT_HEIGHT);  
-    Texture2D spikeltexture = LoadTextureFromImage(spikel);
-    UnloadImage(spikel);
-
-    Image spiker = LoadImage("nSpike.png");
-    ImageRotate(&spiker, 180);
-    ImageResize(&spiker, SLOT_HEIGHT, SLOT_HEIGHT);
-    Texture2D spikertexture = LoadTextureFromImage(spiker);
-    UnloadImage(spiker);
-
-    Image CoinImage = LoadImage("coin.png");
-    ImageResize(&CoinImage, 64, 64);
-    Texture2D Cointexture = LoadTextureFromImage(CoinImage);
-
-    Vector2 chickenPosition = { screenWidth/2.0f, screenHeight/2.0f };
-    int chickenspr = 0;
-    int chickendirection = 0; 
-    float velocityY = 0.0f;
-    const float gravity = 0.5f;
-    const float jumpForce = -12.0f;
-    bool dead = false;
-
-    generateSpikes(screenWidth, screenHeight, false); 
-    int frameCounter = 0;
+    Initplayer(Gamevars.screenWidth, Gamevars.screenHeight);
+    InitSpikes(Gamevars.screenWidth, Gamevars.screenHeight); 
+    InitCoin();
 
     while (!WindowShouldClose())
     {
-        if (!dead && startgame) {
-            score += 1;
-            if (IsKeyPressed(KEY_X)) velocityY = jumpForce;
+        if (!Chicken.dead && Gamevars.startgame) {
+            Gamevars.score += 1;
+            if (IsKeyPressed(KEY_X)) Chicken.velocityY = Chicken.jumpForce;
 
-            velocityY += gravity;
-            chickenPosition.y += velocityY;
+            Chicken.velocityY += Chicken.gravity;
+            Chicken.pos.y += Chicken.velocityY;
 
-            if (chickenPosition.y > screenHeight - CHICKEN_SIZE) { chickenPosition.y = screenHeight - CHICKEN_SIZE; velocityY = 0; }
-            if (chickenPosition.y < 0) { chickenPosition.y = 0; velocityY = 0; }
+            if (Chicken.pos.y > Gamevars.screenHeight - CHICKEN_SIZE) { Chicken.pos.y = Gamevars.screenHeight - CHICKEN_SIZE; Chicken.velocityY = 0; }
+            if (Chicken.pos.y < 0) { Chicken.pos.y = 0; Chicken.velocityY = 0; }
 
-            if (chickendirection == 0) chickenPosition.x += 8;
-            if (chickendirection == 2) chickenPosition.x -= 8;
+            if (Chicken.direction == 0) Chicken.pos.x += 8;
+            if (Chicken.direction == 2) Chicken.pos.x -= 8;
 
-            if (chickenPosition.x >= screenWidth - CHICKEN_SIZE) {
-                chickendirection = 2; 
-                chickenPosition.x = screenWidth - CHICKEN_SIZE;
-                generateSpikes(screenWidth, screenHeight, true); 
-            } else if (chickenPosition.x <= 0) {
-                chickendirection = 0; 
-                chickenPosition.x = 0;
-                generateSpikes(screenWidth, screenHeight, false); 
+            if (Chicken.pos.x >= Gamevars.screenWidth - CHICKEN_SIZE) {
+                Chicken.direction = 2; 
+                Chicken.pos.x = Gamevars.screenWidth - CHICKEN_SIZE;
+                generateSpikes(Gamevars.screenWidth, Gamevars.screenHeight, true); 
+            } else if (Chicken.pos.x <= 0) {
+                Chicken.direction = 0; 
+                Chicken.pos.x = 0;
+                generateSpikes(Gamevars.screenWidth, Gamevars.screenHeight, false); 
             }
 
-            frameCounter++;
-            if (frameCounter % 20 == 0) chickenspr = 1 - chickenspr;
+            Gamevars.frameCounter++;
+            if (Gamevars.frameCounter % 20 == 0) Chicken.spr = 1 - Chicken.spr;
 
-            Rectangle chickenRect = { chickenPosition.x + 8, chickenPosition.y + 8, CHICKEN_SIZE-(0.2*CHICKEN_SIZE), CHICKEN_SIZE-(0.2*CHICKEN_SIZE) };
+            Rectangle chickenRect = { Chicken.pos.x + 8, Chicken.pos.y + 8, CHICKEN_SIZE-(0.2*CHICKEN_SIZE), CHICKEN_SIZE-(0.2*CHICKEN_SIZE) };
             
             for (int i = 0; i < NUM_SPIKES; i++) {
                 Rectangle leftSpikeRect = { lspikes[i].pos.x, lspikes[i].pos.y + 20, 44, 24 };
@@ -112,32 +51,32 @@ int main(void)
                 
                 if ((lspikes[i].active && CheckCollisionRecs(chickenRect, leftSpikeRect)) ||
                     (rspikes[i].active && CheckCollisionRecs(chickenRect, rightSpikeRect))) {
-                    dead = true;
+                    Chicken.dead = true;
                     break;
                 }
             }
             Rectangle coinRect = { maincoin.pos.x+12, maincoin.pos.y+4, 40, 56};
             if (CheckCollisionRecs(chickenRect, coinRect)) {
-                generateCoin(screenWidth, screenHeight);
-                Coins += 1;
-                score += 100;
+                generateCoin(Gamevars.screenWidth, Gamevars.screenHeight);
+                Gamevars.Coins += 1;
+                Gamevars.score += 100;
             }
-        } else if (!startgame) { 
+        } else if (!Gamevars.startgame) { 
             if (IsKeyPressed(KEY_X)) {
-                startgame = true;
-                generateCoin(screenWidth, screenHeight);
+                Gamevars.startgame = true;
+                generateCoin(Gamevars.screenWidth, Gamevars.screenHeight);
 
             }
         }else {
             if (IsKeyPressed(KEY_X)) {
-                dead = false;
-                if (highscore<score) {highscore=score;}
-                score = 0;
-                chickenPosition = (Vector2){ screenWidth/2.0f, screenHeight/2.0f };
-                velocityY = 0;
-                chickenspr = 0;
-                chickendirection = 0;
-                generateSpikes(screenWidth, screenHeight, false);
+                Chicken.dead = false;
+                if (Gamevars.highscore<Gamevars.score) {Gamevars.highscore=Gamevars.score;}
+                Gamevars.score = 0;
+                Chicken.pos = (Vector2){ Gamevars.screenWidth/2.0f, Gamevars.screenHeight/2.0f };
+                Chicken.velocityY = 0;
+                Chicken.spr = 0;
+                Chicken.direction = 0;
+                generateSpikes(Gamevars.screenWidth, Gamevars.screenHeight, false);
             }
         }
 
@@ -147,29 +86,29 @@ int main(void)
         for (int i = 0; i < NUM_SPIKES; i++) {
             
             
-            if (lspikes[i].active) DrawTextureEx(spikeltexture, lspikes[i].pos, 0.0f, 1.0f, WHITE);
-            if (rspikes[i].active) DrawTextureEx(spikertexture, rspikes[i].pos, 0.0f, 1.0f, WHITE);
+            if (lspikes[i].active) DrawTextureEx(lspikes[i].spiketexture, lspikes[i].pos, 0.0f, 1.0f, WHITE);
+            if (rspikes[i].active) DrawTextureEx(lspikes[i].spiketexture, rspikes[i].pos, 0.0f, 1.0f, WHITE);
         }
 
-        if (!dead && startgame) {
-            DrawTextureEx(Cointexture, maincoin.pos, 0.0f, 1.0f, WHITE);
-            DrawTexture(chickentextures[chickenspr + chickendirection],
-                        (int)chickenPosition.x, (int)chickenPosition.y, WHITE);
-        } else if (!startgame) {
-            DrawText("PRESS X TO TART", screenWidth/4+60, (screenHeight/2)-30, 40, BLACK);
+        if (!Chicken.dead && Gamevars.startgame) {
+            DrawTextureEx(maincoin.texture, maincoin.pos, 0.0f, 1.0f, WHITE);
+            DrawTexture(Chicken.textures[Chicken.spr + Chicken.direction],
+                        (int)Chicken.pos.x, (int)Chicken.pos.y, WHITE);
+        } else if (!Gamevars.startgame) {
+            DrawText("PRESS X TO TART", Gamevars.screenWidth/4+60, (Gamevars.screenHeight/2)-30, 40, BLACK);
         } else {
-            DrawText("YOU DIED! PRESS X TO RESTART", screenWidth/4-80, (screenHeight/2)-30, 40, RED);
-            DrawText(TextFormat("Highscore: %d", highscore), screenWidth/4+140, (screenHeight/2)+20, 40, RED);
-            DrawText(TextFormat("Score: %d", score), screenWidth/4+140, (screenHeight/2)+70, 40, RED);
+            DrawText("YOU DIED! PRESS X TO RESTART", Gamevars.screenWidth/4-80, (Gamevars.screenHeight/2)-30, 40, RED);
+            DrawText(TextFormat("Highscore: %d", Gamevars.highscore), Gamevars.screenWidth/4+140, (Gamevars.screenHeight/2)+20, 40, RED);
+            DrawText(TextFormat("Score: %d", Gamevars.score), Gamevars.screenWidth/4+140, (Gamevars.screenHeight/2)+70, 40, RED);
         }
-        DrawText(TextFormat("Score: %d", score), 8, 8, 20, WHITE);
-        DrawText(TextFormat("Coins: %d", Coins), 8, 32, 20, YELLOW);
+        DrawText(TextFormat("Score: %d", Gamevars.score), 8, 8, 20, WHITE);
+        DrawText(TextFormat("Coins: %d", Gamevars.Coins), 8, 32, 20, YELLOW);
         EndDrawing();
     }
 
-    for (int i = 0; i < NUM_TEXTURES; i++) UnloadTexture(chickentextures[i]);
-    UnloadTexture(spikertexture);
-    UnloadTexture(spikeltexture);
+    for (int i = 0; i < NUM_TEXTURES; i++) UnloadTexture(Chicken.textures[i]);
+    for (int i = 0; i < NUM_SPIKES; i++) UnloadTexture(lspikes[i].spiketexture);
+    for (int i = 0; i < NUM_SPIKES; i++) UnloadTexture(rspikes[i].spiketexture);
     CloseWindow();
     
     return 0;
