@@ -2,11 +2,12 @@ name: Build and Release
 
 on:
   push:
-    branches: [ "**" ]    
+    branches: [ "**" ]   
     tags:
       - 'v*'           
   pull_request:
     branches: [ "**" ]    
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -28,17 +29,25 @@ jobs:
         run: |
           cmake --build build --config Release
 
-      - name: Bundle Executable & Assets
+      - name: Bundle Executable & Data
         run: |
           mkdir release_assets
-          # Spiel-Binary kopieren (prüft verschiedene mögliche Pfade im Build-Ordner)
+          
+          # Spiel-Binary kopieren
           if [ -f build/spiel ]; then
             cp build/spiel release_assets/
           else
             cp spiel release_assets/
           fi
-          # Bilder mit ins Paket packen
+          
+          # Einzelne PNGs im Hauptordner kopieren (falls vorhanden)
           cp *.png release_assets/ 2>/dev/null || true
+
+          # Den gesamten data/-Ordner inklusive allen Inhalten mitnehmen
+          if [ -d "data" ]; then
+            cp -r data release_assets/
+          fi
+
           cd release_assets && zip -r ../JumperChicken-Linux.zip .
 
       - name: Upload Build Artifact
@@ -48,7 +57,6 @@ jobs:
           path: JumperChicken-Linux.zip
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: JumperChicken-Linux.zip
