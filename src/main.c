@@ -8,6 +8,7 @@ int main(void)
 {
     Initgamevars();
     InitWindow(Gamevars.screenWidth, Gamevars.screenHeight, "Jumper Chicken");
+    InitAudioDevice();
     SetTargetFPS(60);
     srand(time(NULL));
 
@@ -63,6 +64,7 @@ int main(void)
                 generateCoin(Gamevars.screenWidth, Gamevars.screenHeight);
                 Gamevars.Coins += 1;
                 Gamevars.score += 100;
+                PlaySound(maincoin.sound);
             }
         } else if (!Gamevars.startgame) { 
             if (IsKeyPressed(KEY_X)) {

@@ -16,6 +16,7 @@ typedef struct Spike {
 typedef struct Coin {
     Vector2 pos;
     Texture2D texture;
+    Sound sound;
 } Coin;
 
 typedef struct Player{
@@ -116,6 +117,7 @@ void InitCoin() {
     Image CoinImage = LoadImage("data/coin.png");
     ImageResize(&CoinImage, 64, 64);
     maincoin.texture = LoadTextureFromImage(CoinImage);
+    maincoin.sound = LoadSound("data/coin.wav");
 }
 
 void Initplayer(int screenWidth, int screenHeight){
