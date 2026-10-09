@@ -1,4 +1,5 @@
 #include "raylib.h"
+#include <stdbool.h>
 #include <stdlib.h>
 #include "Filerw.c"
 
@@ -40,11 +41,25 @@ typedef struct Gamelogik{
     int screenHeight;
 } Gamelogik ;
 
+typedef struct Menutextcolors {
+    Color text1;
+    Color text2;
+} Menutextcolors;
+
+typedef struct Menu {
+    int auswahl;
+    bool enabled;
+    int untermenu;
+    Menutextcolors colours;
+} Menu ;
+
+
 Spike lspikes[NUM_SPIKES];
 Spike rspikes[NUM_SPIKES];
 Coin maincoin;
 Player Chicken;
 Gamelogik Gamevars;
+Menu Menuvars;
 
 void Initgamevars() {
     Gamevars.score = 0;
@@ -56,6 +71,23 @@ void Initgamevars() {
     Gamevars.screenHeight = 720;
 }
 
+void setcolors() {
+    if (Menuvars.auswahl == 0) {
+        Menuvars.colours.text1 = RED;
+        Menuvars.colours.text2 = WHITE;
+    } else if (Menuvars.auswahl == 1) {
+        Menuvars.colours.text1 = WHITE;
+        Menuvars.colours.text2 = RED;
+    }
+}
+
+void Initcolors() {
+    Menuvars.colours.text1 = RED;
+    Menuvars.colours.text2 = WHITE;
+    Menuvars.enabled = true;
+    Menuvars.auswahl = 0;
+    Menuvars.untermenu = 0;
+}
 
 void generateSpikes(int screenWidth, int screenHeight, bool activateLeft) {
     const int totalSlots = screenHeight / SLOT_HEIGHT; 
