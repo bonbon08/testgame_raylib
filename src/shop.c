@@ -120,26 +120,16 @@ int PreviewedBackground() {
     return Shopvars.background;
 }
 
-void UpdateShop(int screenWidth) {
-    if (Shopvars.messageTimer > 0) Shopvars.messageTimer--;
+Rectangle ShopBackButtonRect() {
+    return (Rectangle){ 24, 32, 130, 52 };
+}
 
-    if (IsKeyPressed(KEY_BACKSPACE)) {
-        Menuvars.untermenu = 0;
-        return;
-    }
+Rectangle ShopAdButtonRect(int screenWidth) {
+    return (Rectangle){ screenWidth - 420, 32, 230, 52 };
+}
 
-    int size = shopRowSize(Shopvars.row);
-    if (IsKeyPressed(KEY_LEFT)) Shopvars.col = (Shopvars.col - 1 + size) % size;
-    if (IsKeyPressed(KEY_RIGHT)) Shopvars.col = (Shopvars.col + 1) % size;
-    if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_DOWN)) {
-        Shopvars.row = 1 - Shopvars.row;
-        if (Shopvars.col >= shopRowSize(Shopvars.row)) Shopvars.col = shopRowSize(Shopvars.row) - 1;
-    }
-
-    if (!IsKeyPressed(KEY_X)) return;
-
-    bool isCharacter = Shopvars.row == 0;
-    int item = Shopvars.col;
+void shopActivate(int row, int item, int screenWidth) {
+    bool isCharacter = row == 0;
     int *owned = isCharacter ? &Shopvars.ownedCharacters : &Shopvars.ownedBackgrounds;
     int *equipped = isCharacter ? &Shopvars.character : &Shopvars.background;
     const char *name = isCharacter ? characters[item].name : themes[item].name;
@@ -153,7 +143,7 @@ void UpdateShop(int screenWidth) {
         *owned |= 1 << item;
         *equipped = item;
         setShopMessage(TextFormat("Bought %s!", name), (Color){ 120, 230, 120, 255 });
-        Rectangle card = shopCardRect(Shopvars.row, item, screenWidth);
+        Rectangle card = shopCardRect(row, item, screenWidth);
         SpawnParticles((Vector2){ card.x + card.width / 2, card.y + card.height / 2 }, 40, YELLOW, 7.0f, 7.0f);
         PlaySound(maincoin.sound);
     } else {
@@ -161,6 +151,49 @@ void UpdateShop(int screenWidth) {
         return;
     }
     SaveGame();
+}
+
+void UpdateShop(int screenWidth) {
+    if (Shopvars.messageTimer > 0) Shopvars.messageTimer--;
+
+    if (BackPressed() || PointerPressedIn(ShopBackButtonRect())) {
+        Menuvars.untermenu = 0;
+        return;
+    }
+
+    if (AdsSupported() && PointerPressedIn(ShopAdButtonRect(screenWidth))) {
+        if (RewardedAdReady()) ShowRewardedAd(REWARD_COINS);
+        else setShopMessage("No ad available right now - try again later", WHITE);
+        return;
+    }
+
+    int size = shopRowSize(Shopvars.row);
+    if (IsKeyPressed(KEY_LEFT)) Shopvars.col = (Shopvars.col - 1 + size) % size;
+    if (IsKeyPressed(KEY_RIGHT)) Shopvars.col = (Shopvars.col + 1) % size;
+    if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_DOWN)) {
+        Shopvars.row = 1 - Shopvars.row;
+        if (Shopvars.col >= shopRowSize(Shopvars.row)) Shopvars.col = shopRowSize(Shopvars.row) - 1;
+    }
+
+    if (IsKeyPressed(KEY_X)) {
+        shopActivate(Shopvars.row, Shopvars.col, screenWidth);
+        return;
+    }
+
+    // Tapping a card selects it, tapping the selected card again buys / equips it
+    if (!PointerPressed()) return;
+    for (int row = 0; row < 2; row++) {
+        for (int col = 0; col < shopRowSize(row); col++) {
+            if (!CheckCollisionPointRec(PointerPosition(), shopCardRect(row, col, screenWidth))) continue;
+            if (Shopvars.row == row && Shopvars.col == col) {
+                shopActivate(row, col, screenWidth);
+            } else {
+                Shopvars.row = row;
+                Shopvars.col = col;
+            }
+            return;
+        }
+    }
 }
 
 void drawShopCard(int row, int col, int screenWidth, int screenHeight) {
@@ -216,6 +249,11 @@ void DrawShop(int screenWidth, int screenHeight) {
     int centerX = screenWidth / 2;
 
     drawTextShadowCentered("SHOP", centerX, 28, 60, MENU_GOLD);
+    drawButton(ShopBackButtonRect(), "BACK", 26, Fade(BLACK, 0.4f), 1.0f);
+    if (AdsSupported()) {
+        drawButton(ShopAdButtonRect(screenWidth), TextFormat("AD: +%d COINS", AD_REWARD_COINS), 22,
+                   MENU_GREEN, RewardedAdReady() ? 1.0f : 0.5f);
+    }
 
     const char *coinsText = TextFormat("%d", Gamevars.Coins);
     int coinsWidth = MeasureText(coinsText, 32);
@@ -234,5 +272,7 @@ void DrawShop(int screenWidth, int screenHeight) {
         drawTextShadowCentered(Shopvars.message, centerX, 636, 24, Fade(Shopvars.messageColor, alpha));
     }
 
-    drawTextShadowCentered("ARROWS to choose   -   X to buy / equip   -   BACKSPACE to go back", centerX, screenHeight - 38, 20, WHITE);
+    const char *hint = IS_MOBILE ? "Tap a card to choose   -   tap it again to buy / equip"
+                                 : "ARROWS to choose   -   X to buy / equip   -   BACKSPACE to go back";
+    drawTextShadowCentered(hint, centerX, screenHeight - 38, 20, WHITE);
 }

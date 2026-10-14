@@ -9,3 +9,44 @@ Requires CMake (3.11+) and a C compiler. raylib is downloaded automatically duri
     ./spiel
 
 Alternatively, `run.sh` cleans previous build files, rebuilds and starts the game.
+
+## Controls
+
+- Desktop: X / Space / click to jump, arrow keys + X in menus, BACKSPACE to go back
+- Android: tap to jump and to use the menus, the back button goes back
+
+## Android
+
+The Android app lives in `android/` and shares the game code in `src/`.
+Requires JDK 17+ and the Android SDK with `platforms;android-36`, `build-tools;36.0.0`,
+`ndk;29.0.14206865` and `cmake;3.31.6`.
+
+    cd android
+    echo "sdk.dir=$HOME/Android/Sdk" > local.properties
+    ./gradlew assembleDebug
+    adb install -r app/build/outputs/apk/debug/app-debug.apk
+
+The APK ends up in `android/app/build/outputs/apk/debug/`. GitHub Actions also builds it on every push.
+
+### Ads (Google AdMob)
+
+The game offers optional rewarded videos: +10 coins in the shop and one revive per run.
+A GDPR consent dialog (Google UMP) is shown where required, and a PRIVACY button in the
+menu lets players change their choice.
+
+Debug builds always use Google's test ads. For a release with real ads:
+
+1. Create an app and a rewarded ad unit in AdMob and set up the GDPR message under
+   "Privacy & messaging".
+2. Put the IDs and your signing key into `~/.gradle/gradle.properties` (never commit them):
+
+        jumperchicken.admobAppId=ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY
+        jumperchicken.admobRewardedId=ca-app-pub-XXXXXXXXXXXXXXXX/ZZZZZZZZZZ
+        jumperchicken.keystore=/path/to/release.jks
+        jumperchicken.keystorePassword=...
+        jumperchicken.keyAlias=...
+        jumperchicken.keyPassword=...
+
+3. Build with `./gradlew bundleRelease` and upload the `.aab` to the Google Play Console.
+
+Never tap your own real ads; AdMob bans accounts for that. Use the debug build for testing.
