@@ -5,6 +5,7 @@
 #include "objects.c"
 #include "input.c"
 #include "ads.c"
+#include "audio.c"
 #include "background.c"
 #include "effects.c"
 #include "menu.c"
@@ -60,8 +61,8 @@ void KillChicken() {
     SaveGame();
     StartShake(10.0f, 20);
     Vector2 center = { Chicken.pos.x + CHICKEN_SIZE / 2.0f, Chicken.pos.y + CHICKEN_SIZE / 2.0f };
-    SpawnParticles(center, 24, characters[Shopvars.character].body, 6.0f, 7.0f);
-    SpawnParticles(center, 8, characters[Shopvars.character].shade, 5.0f, 6.0f);
+    SpawnParticles(center, 24, characters[Shopvars.equipped[ROW_CHARACTERS]].body, 6.0f, 7.0f);
+    SpawnParticles(center, 8, characters[Shopvars.equipped[ROW_CHARACTERS]].shade, 5.0f, 6.0f);
 }
 
 // Continue the run after watching an ad: back to the middle, keep the score
@@ -119,8 +120,9 @@ void updateGameplay() {
     if (IsKeyPressed(KEY_X) || IsKeyPressed(KEY_SPACE) || PointerPressed()) {
         Chicken.velocityY = Chicken.jumpForce;
         Chicken.squash = 1.0f;
+        PlayJumpSound();
         SpawnParticles((Vector2){ Chicken.pos.x + CHICKEN_SIZE / 2.0f, Chicken.pos.y + CHICKEN_SIZE - 8 },
-                       4, Fade(characters[Shopvars.character].body, 0.8f), 2.5f, 6.0f);
+                       4, Fade(characters[Shopvars.equipped[ROW_CHARACTERS]].body, 0.8f), 2.5f, 6.0f);
     }
 
     Chicken.velocityY += Chicken.gravity;
@@ -194,6 +196,11 @@ void updateMenu() {
     }
 
     if (IsKeyPressed(KEY_BACK)) Menuvars.quit = true;   // Android back button leaves the game
+    if (IsKeyPressed(KEY_M) || PointerPressedIn(MusicButtonRect())) {
+        Shopvars.musicOn = !Shopvars.musicOn;
+        SaveGame();
+        return;
+    }
     if (IsKeyPressed(KEY_X)) selectMenuOption(Menuvars.auswahl);
     else if (IsKeyPressed(KEY_UP)) Menuvars.auswahl = (Menuvars.auswahl - 1 + MENU_OPTIONS) % MENU_OPTIONS;
     else if (IsKeyPressed(KEY_DOWN)) Menuvars.auswahl = (Menuvars.auswahl + 1) % MENU_OPTIONS;
@@ -259,7 +266,8 @@ void drawFrame() {
     if (Menuvars.enabled) {
         if (Menuvars.untermenu == 0) {
             DrawMainMenu(Gamevars.screenWidth, Gamevars.screenHeight, Menuvars.auswahl,
-                         CurrentCharacterTexture(0), Gamevars.highscore, Gamevars.Coins, PrivacyOptionsRequired());
+                         CurrentCharacterTexture(0), Gamevars.highscore, Gamevars.Coins, PrivacyOptionsRequired(),
+                         Shopvars.musicOn);
         } else {
             DrawShop(Gamevars.screenWidth, Gamevars.screenHeight);
         }
@@ -298,12 +306,14 @@ int main(void)
     InitCoin();
     InitCharacters();
     InitBackground(Gamevars.screenWidth, Gamevars.screenHeight);
+    InitGameAudio(Shopvars.equipped[ROW_MUSIC], Shopvars.musicOn);
 
     while (!WindowShouldClose() && !Menuvars.quit)
     {
         UpdateBackground(Gamevars.screenWidth, Gamevars.screenHeight);
         UpdateEffects();
         applyAdRewards();
+        UpdateGameAudio(PreviewedTrack(), MusicAudible());
 
         if (!Chicken.dead && Gamevars.startgame) updateGameplay();
         else if (Menuvars.enabled) updateMenu();
@@ -315,6 +325,7 @@ int main(void)
     SaveGame();
 
     CloseAds();
+    CloseGameAudio();
     UnloadCharacters();
     UnloadTexture(spikeLeftTex);
     UnloadTexture(spikeRightTex);

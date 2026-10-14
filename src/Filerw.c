@@ -13,8 +13,11 @@ typedef struct SaveData {
     int coins;
     int ownedCharacters;   // bitmask: bit i set = character i bought
     int ownedBackgrounds;  // bitmask: bit i set = background i bought
+    int ownedMusic;        // bitmask: bit i set = music track i bought
     int character;
     int background;
+    int music;
+    int musicOn;
 } SaveData;
 
 void defaultSave(SaveData *save) {
@@ -22,8 +25,11 @@ void defaultSave(SaveData *save) {
     save->coins = 0;
     save->ownedCharacters = 1;
     save->ownedBackgrounds = 1;
+    save->ownedMusic = 1;
     save->character = 0;
     save->background = 0;
+    save->music = 0;
+    save->musicOn = 1;
 }
 
 void sanitizeSave(SaveData *save) {
@@ -31,6 +37,8 @@ void sanitizeSave(SaveData *save) {
     if (save->coins < 0) save->coins = 0;
     save->ownedCharacters |= 1;   // the default items are always owned
     save->ownedBackgrounds |= 1;
+    save->ownedMusic |= 1;
+    save->musicOn = save->musicOn != 0;
 }
 
 bool readLegacyInt(const char *filename, int *value) {
@@ -67,6 +75,9 @@ bool LoadSave(SaveData *save) {
         else if (strcmp(key, "owned_backgrounds") == 0) save->ownedBackgrounds = value;
         else if (strcmp(key, "character") == 0) save->character = value;
         else if (strcmp(key, "background") == 0) save->background = value;
+        else if (strcmp(key, "owned_music") == 0) save->ownedMusic = value;
+        else if (strcmp(key, "music") == 0) save->music = value;
+        else if (strcmp(key, "music_on") == 0) save->musicOn = value;
     }
     fclose(fp);
 
@@ -80,9 +91,10 @@ bool WriteSave(const SaveData *save) {
     if (fp == NULL) return false;
 
     bool ok = fprintf(fp,
-                      "highscore=%d\ncoins=%d\nowned_characters=%d\nowned_backgrounds=%d\ncharacter=%d\nbackground=%d\n",
-                      save->highscore, save->coins, save->ownedCharacters,
-                      save->ownedBackgrounds, save->character, save->background) > 0;
+                      "highscore=%d\ncoins=%d\nowned_characters=%d\nowned_backgrounds=%d\nowned_music=%d\n"
+                      "character=%d\nbackground=%d\nmusic=%d\nmusic_on=%d\n",
+                      save->highscore, save->coins, save->ownedCharacters, save->ownedBackgrounds,
+                      save->ownedMusic, save->character, save->background, save->music, save->musicOn) > 0;
     if (fclose(fp) != 0) ok = false;
 
     if (!ok) {
