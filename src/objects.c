@@ -1,11 +1,11 @@
 #include "raylib.h"
 #include <stdbool.h>
 #include <stdlib.h>
+#include <math.h>
 #include "Filerw.c"
 
-#define NUM_TEXTURES 4
-#define NUM_SPIKES 5   
-#define SLOT_HEIGHT 64 
+#define NUM_SPIKES 5
+#define SLOT_HEIGHT 64
 #define CHICKEN_SIZE 64
 
 typedef struct Spike {
@@ -22,12 +22,13 @@ typedef struct Coin {
 
 typedef struct Player{
     Vector2 pos;
-    int spr;
     int direction;
-    Texture2D textures[4];
     float velocityY;
     float gravity;
     float jumpForce;
+    float rotation;
+    float squash;      // > 0 stretches the chicken (jump), < 0 flattens it (landing)
+    int deathTimer;
     bool dead;
 } Player;
 
@@ -35,22 +36,18 @@ typedef struct Gamelogik{
     int score;
     int highscore;
     int Coins;
+    bool newHighscore;
     bool startgame;
     int frameCounter;
     int screenWidth;
     int screenHeight;
 } Gamelogik ;
 
-typedef struct Menutextcolors {
-    Color text1;
-    Color text2;
-} Menutextcolors;
-
 typedef struct Menu {
     int auswahl;
     bool enabled;
-    int untermenu;
-    Menutextcolors colours;
+    int untermenu;     // 0 = main menu, 1 = shop
+    bool quit;
 } Menu ;
 
 
@@ -63,55 +60,45 @@ Menu Menuvars;
 
 void Initgamevars() {
     Gamevars.score = 0;
-    Gamevars.highscore = read_values(0);
-    Gamevars.Coins = read_values(1);
+    Gamevars.highscore = 0;
+    Gamevars.Coins = 0;
+    Gamevars.newHighscore = false;
     Gamevars.startgame = false;
     Gamevars.frameCounter = 0;
     Gamevars.screenWidth = 1080;
     Gamevars.screenHeight = 720;
 }
 
-void setcolors() {
-    if (Menuvars.auswahl == 0) {
-        Menuvars.colours.text1 = RED;
-        Menuvars.colours.text2 = WHITE;
-    } else if (Menuvars.auswahl == 1) {
-        Menuvars.colours.text1 = WHITE;
-        Menuvars.colours.text2 = RED;
-    }
-}
-
 void Initcolors() {
-    Menuvars.colours.text1 = RED;
-    Menuvars.colours.text2 = WHITE;
     Menuvars.enabled = true;
+    Menuvars.quit = false;
     Menuvars.auswahl = 0;
     Menuvars.untermenu = 0;
 }
 
 void generateSpikes(int screenWidth, int screenHeight, bool activateLeft) {
-    const int totalSlots = screenHeight / SLOT_HEIGHT; 
-    
+    const int totalSlots = screenHeight / SLOT_HEIGHT;
+
     int *allSlots = (int *)malloc(totalSlots * sizeof(int));
     for (int i = 0; i < totalSlots; i++) {
         allSlots[i] = i;
     }
-    
+
     for (int i = totalSlots - 1; i > 0; i--) {
         int j = rand() % (i + 1);
         int temp = allSlots[i];
         allSlots[i] = allSlots[j];
         allSlots[j] = temp;
     }
-    
+
     for (int i = 0; i < NUM_SPIKES; i++) {
         lspikes[i].pos = (Vector2){ 0, (float)(allSlots[i] * SLOT_HEIGHT) };
         lspikes[i].active = activateLeft;
-        
+
         rspikes[i].pos = (Vector2){ (float)(screenWidth), (float)(allSlots[i] * SLOT_HEIGHT) };
         rspikes[i].active = !activateLeft;
     }
-    
+
     free(allSlots);
 }
 
@@ -120,7 +107,7 @@ Texture2D spikeRightTex;
 
 void InitSpikes(int screenWidth, int screenHeight) {
     Image spikel = LoadImage("data/nSpike.png");
-    ImageResize(&spikel, SLOT_HEIGHT, SLOT_HEIGHT);  
+    ImageResize(&spikel, SLOT_HEIGHT, SLOT_HEIGHT);
     spikeLeftTex = LoadTextureFromImage(spikel);
     UnloadImage(spikel);
 
@@ -149,42 +136,41 @@ void InitCoin() {
     Image CoinImage = LoadImage("data/coin.png");
     ImageResize(&CoinImage, 64, 64);
     maincoin.texture = LoadTextureFromImage(CoinImage);
+    UnloadImage(CoinImage);
     maincoin.sound = LoadSound("data/coin.wav");
 }
 
+// The coin spins (squeezed horizontally) and floats up and down
+void DrawCoin() {
+    float time = (float)GetTime();
+    float spin = fabsf(cosf(time * 3.0f));
+    if (spin < 0.15f) spin = 0.15f;
+    float bob = 6.0f * sinf(time * 4.0f);
+
+    Rectangle source = { 0, 0, (float)maincoin.texture.width, (float)maincoin.texture.height };
+    Rectangle dest = { maincoin.pos.x + 32, maincoin.pos.y + 32 + bob, 64 * spin, 64 };
+    DrawTexturePro(maincoin.texture, source, dest, (Vector2){ dest.width / 2, 32 }, 0.0f, WHITE);
+}
+
 void Initplayer(int screenWidth, int screenHeight){
-    Image chickenImage1r = LoadImage("data/Chicken.png");
-    ImageResize(&chickenImage1r, CHICKEN_SIZE, CHICKEN_SIZE);
-    ImageRotate(&chickenImage1r, -20);
-    Chicken.textures[0] = LoadTextureFromImage(chickenImage1r);
-    UnloadImage(chickenImage1r); 
-
-    Image chickenImage2r = LoadImage("data/Chicken.png");
-    ImageResize(&chickenImage2r, CHICKEN_SIZE, CHICKEN_SIZE);
-    ImageRotate(&chickenImage2r, 20);
-    Chicken.textures[1] = LoadTextureFromImage(chickenImage2r);
-    UnloadImage(chickenImage2r); 
-
-    Image chickenImage1l = LoadImage("data/Chicken.png");
-    ImageResize(&chickenImage1l, CHICKEN_SIZE, CHICKEN_SIZE);
-    ImageRotate(&chickenImage1l, -20);
-    ImageFlipHorizontal(&chickenImage1l);
-    Chicken.textures[2] = LoadTextureFromImage(chickenImage1l);
-    UnloadImage(chickenImage1l); 
-
-    Image chickenImage2l = LoadImage("data/Chicken.png");
-    ImageResize(&chickenImage2l, CHICKEN_SIZE, CHICKEN_SIZE);
-    ImageRotate(&chickenImage2l, 20);
-    ImageFlipHorizontal(&chickenImage2l);
-    Chicken.textures[3] = LoadTextureFromImage(chickenImage2l);
-    UnloadImage(chickenImage2l); 
-
     Chicken.pos = (Vector2){ screenWidth/2.0f, screenHeight/2.0f };
-    Chicken.spr = 0;
-    Chicken.direction = 0; 
+    Chicken.direction = 0;
 
     Chicken.velocityY = 0.1f;
     Chicken.gravity = 0.5f;
     Chicken.jumpForce = -12.0f;
+    Chicken.rotation = 0.0f;
+    Chicken.squash = 0.0f;
+    Chicken.deathTimer = 0;
     Chicken.dead = false;
+}
+
+void DrawChicken(Texture2D texture) {
+    float scaleX = 1.0f - 0.25f * Chicken.squash;
+    float scaleY = 1.0f + 0.25f * Chicken.squash;
+
+    Rectangle source = { 0, 0, (float)texture.width, (float)texture.height };
+    Rectangle dest = { Chicken.pos.x + CHICKEN_SIZE / 2.0f, Chicken.pos.y + CHICKEN_SIZE / 2.0f,
+                       CHICKEN_SIZE * scaleX, CHICKEN_SIZE * scaleY };
+    DrawTexturePro(texture, source, dest, (Vector2){ dest.width / 2, dest.height / 2 }, Chicken.rotation, WHITE);
 }

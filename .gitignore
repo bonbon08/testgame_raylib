@@ -14,3 +14,5 @@ _deps
 .vscode/settings.json
 hscore.txt
 coins.txt
+save.txt
+save.tmp
