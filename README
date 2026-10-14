@@ -1,1 +1,11 @@
-This Game hear is meant as a recreaten of a old mobile game called Jumpstun
+This game here is meant as a recreation of an old mobile game called Jumpstun.
+
+## Building
+
+Requires CMake (3.11+) and a C compiler. raylib is downloaded automatically during configuration.
+
+    cmake . -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+    make
+    ./spiel
+
+Alternatively, `run.sh` cleans previous build files, rebuilds and starts the game.
