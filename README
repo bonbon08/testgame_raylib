@@ -55,6 +55,9 @@ Debug builds always use Google's test ads. For a release with real ads:
         jumperchicken.keyPassword=...
 
 3. Build with `./gradlew bundleRelease` and upload the `.aab` to the Google Play Console.
+   The build stops with a message if the ad IDs or the signing key are missing.
+
+The full publishing checklist (in German), store graphics and listing texts are in `store/`.
 
 Never tap your own real ads; AdMob bans accounts for that. Use the debug build for testing.
 

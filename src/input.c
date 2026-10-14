@@ -1,10 +1,12 @@
 #include "raylib.h"
 #include <stdbool.h>
 
+#ifndef IS_MOBILE   // can be forced with -DIS_MOBILE=true, e.g. for store screenshots
 #if defined(PLATFORM_ANDROID)
 #define IS_MOBILE true
 #else
 #define IS_MOBILE false
+#endif
 #endif
 
 #define MIN_VIRTUAL_WIDTH 960

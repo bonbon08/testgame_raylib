@@ -92,6 +92,25 @@ android {
     }
 }
 
+// A release for the Play Store must show real ads and be signed with the upload key.
+// Building one with test ads would earn nothing, so stop with a clear message instead.
+val releaseProblems = buildList {
+    if (property("jumperchicken.admobAppId") == null) add("jumperchicken.admobAppId")
+    if (property("jumperchicken.admobRewardedId") == null) add("jumperchicken.admobRewardedId")
+    if (property("jumperchicken.keystore") == null) add("jumperchicken.keystore (and its passwords/alias)")
+}
+tasks.matching { it.name == "bundleRelease" || it.name == "assembleRelease" }.configureEach {
+    doFirst {
+        if (releaseProblems.isNotEmpty() && property("jumperchicken.allowTestRelease") == null) {
+            throw GradleException(
+                "Release build is missing: ${releaseProblems.joinToString()}.\n" +
+                "Add them to ~/.gradle/gradle.properties (see README), or pass " +
+                "-Pjumperchicken.allowTestRelease=true for a local test build."
+            )
+        }
+    }
+}
+
 androidComponents {
     onVariants { variant ->
         variant.sources.assets?.addGeneratedSourceDirectory(copyGameAssets, CopyGameAssets::outputDir)
