@@ -4,7 +4,7 @@
 #include <time.h>
 #include "objects.c"
 #include "input.c"
-#include "ads.c"
+#include "services.c"
 #include "audio.c"
 #include "background.c"
 #include "effects.c"
@@ -35,6 +35,7 @@ void StartGame() {
     Menuvars.enabled = false;
     Gamevars.score = 0;
     Gamevars.newHighscore = false;
+    Gamevars.bounces = 0;
     Gamevars.usedRevive = false;
     Chicken.pos = (Vector2){ Gamevars.screenWidth/2.0f, Gamevars.screenHeight/2.0f };
     Chicken.velocityY = 0;
@@ -59,6 +60,7 @@ void KillChicken() {
     Chicken.velocityY = -11.0f;   // a little hop before falling off the screen
     updateHighscore();
     SaveGame();
+    SubmitLeaderboardScore(Gamevars.highscore);
     StartShake(10.0f, 20);
     Vector2 center = { Chicken.pos.x + CHICKEN_SIZE / 2.0f, Chicken.pos.y + CHICKEN_SIZE / 2.0f };
     SpawnParticles(center, 24, characters[Shopvars.equipped[ROW_CHARACTERS]].body, 6.0f, 7.0f);
@@ -114,6 +116,7 @@ void updateGameplay() {
         // Leaving a run keeps the collected coins and the highscore
         updateHighscore();
         SaveGame();
+        SubmitLeaderboardScore(Gamevars.highscore);
         BackToMenu();
         return;
     }
@@ -135,19 +138,21 @@ void updateGameplay() {
     }
     if (Chicken.pos.y < 0) { Chicken.pos.y = 0; Chicken.velocityY = 0; }
 
-    if (Chicken.direction == 0) Chicken.pos.x += 8;
-    if (Chicken.direction == 2) Chicken.pos.x -= 8;
+    if (Chicken.direction == 0) Chicken.pos.x += ChickenSpeed();
+    if (Chicken.direction == 2) Chicken.pos.x -= ChickenSpeed();
 
-    if (Chicken.pos.x >= Gamevars.screenWidth - CHICKEN_SIZE) {
-        Chicken.direction = 2;
-        Chicken.pos.x = Gamevars.screenWidth - CHICKEN_SIZE;
+    bool hitRightWall = Chicken.pos.x >= Gamevars.screenWidth - CHICKEN_SIZE;
+    if (hitRightWall || Chicken.pos.x <= 0) {
+        int oldLevel = GameLevel();
+        Gamevars.bounces++;
+        Chicken.direction = hitRightWall ? 2 : 0;
+        Chicken.pos.x = hitRightWall ? Gamevars.screenWidth - CHICKEN_SIZE : 0;
         Chicken.squash = 0.7f;
-        generateSpikes(Gamevars.screenWidth, Gamevars.screenHeight, true);
-    } else if (Chicken.pos.x <= 0) {
-        Chicken.direction = 0;
-        Chicken.pos.x = 0;
-        Chicken.squash = 0.7f;
-        generateSpikes(Gamevars.screenWidth, Gamevars.screenHeight, false);
+        generateSpikes(Gamevars.screenWidth, Gamevars.screenHeight, hitRightWall);
+        if (GameLevel() > oldLevel) {
+            SpawnPopup((Vector2){ Gamevars.screenWidth / 2.0f, Gamevars.screenHeight / 2.0f - 60 },
+                       TextFormat("LEVEL %d!", GameLevel()), MENU_GOLD);
+        }
     }
 
     // Tilt the beak up while rising and down while falling
@@ -161,7 +166,7 @@ void updateGameplay() {
 
     Rectangle chickenRect = { Chicken.pos.x + 8, Chicken.pos.y + 8, CHICKEN_SIZE-(0.2*CHICKEN_SIZE), CHICKEN_SIZE-(0.2*CHICKEN_SIZE) };
 
-    for (int i = 0; i < NUM_SPIKES && Chicken.invulnerable == 0; i++) {
+    for (int i = 0; i < MAX_SPIKES && Chicken.invulnerable == 0; i++) {
         Rectangle leftSpikeRect = { lspikes[i].pos.x, lspikes[i].pos.y + 20, 44, 24 };
         Rectangle rightSpikeRect = { rspikes[i].pos.x -44, rspikes[i].pos.y + 20, 44, 24 };
 
@@ -206,6 +211,8 @@ void updateMenu() {
     else if (IsKeyPressed(KEY_DOWN)) Menuvars.auswahl = (Menuvars.auswahl + 1) % MENU_OPTIONS;
     else if (PrivacyOptionsRequired() && PointerPressedIn(PrivacyButtonRect(Gamevars.screenWidth, Gamevars.screenHeight))) {
         ShowPrivacyOptions();
+    } else if (LeaderboardAvailable() && PointerPressedIn(LeaderboardButtonRect(Gamevars.screenWidth))) {
+        ShowLeaderboard();   // signs the player in first if needed
     } else {
         for (int i = 0; i < MENU_OPTIONS; i++) {
             if (!PointerPressedIn(MenuOptionRect(i, Gamevars.screenWidth))) continue;
@@ -246,7 +253,7 @@ void drawFrame() {
 
     BeginMode2D(camera);
     if (!Menuvars.enabled) {
-        for (int i = 0; i < NUM_SPIKES; i++) {
+        for (int i = 0; i < MAX_SPIKES; i++) {
             if (lspikes[i].active) DrawTextureEx(lspikes[i].spiketexture, lspikes[i].pos, 0.0f, 1.0f, WHITE);
             if (rspikes[i].active) {
                     Vector2 rotatedPos = {
@@ -267,13 +274,14 @@ void drawFrame() {
         if (Menuvars.untermenu == 0) {
             DrawMainMenu(Gamevars.screenWidth, Gamevars.screenHeight, Menuvars.auswahl,
                          CurrentCharacterTexture(0), Gamevars.highscore, Gamevars.Coins, PrivacyOptionsRequired(),
-                         Shopvars.musicOn);
+                         Shopvars.musicOn, LeaderboardAvailable(), PlayerName(), SignInState());
         } else {
             DrawShop(Gamevars.screenWidth, Gamevars.screenHeight);
         }
     } else {
         DrawText(TextFormat("Score: %d", Gamevars.score), 8, 8, 20, WHITE);
         DrawText(TextFormat("Coins: %d", Gamevars.Coins), 8, 32, 20, YELLOW);
+        DrawText(TextFormat("Level: %d", GameLevel()), 8, 56, 20, MENU_GOLD);
     }
 
     DrawEffects();
@@ -300,6 +308,7 @@ int main(void)
     prepareSaveDirectory();
     LoadGame();
     InitAds();
+    SubmitLeaderboardScore(Gamevars.highscore);   // uploads a highscore from before the leaderboard existed
     Initplayer(Gamevars.screenWidth, Gamevars.screenHeight);
     InitSpikes(Gamevars.screenWidth, Gamevars.screenHeight);
     Initcolors();

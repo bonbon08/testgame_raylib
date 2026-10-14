@@ -19,6 +19,7 @@ import com.google.android.gms.ads.LoadAdError;
 import com.google.android.gms.ads.MobileAds;
 import com.google.android.gms.ads.rewarded.RewardedAd;
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback;
+import com.google.android.gms.games.PlayGames;
 import com.google.android.ump.ConsentInformation;
 import com.google.android.ump.ConsentRequestParameters;
 import com.google.android.ump.UserMessagingPlatform;
@@ -27,12 +28,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Hosts the raylib game (NativeActivity) and handles rewarded ads.
+ * Hosts the raylib game (NativeActivity) and handles rewarded ads and the Play Games leaderboard.
  * The native code (src/ads.c) calls the public methods below from the game thread.
  */
 public class MainActivity extends NativeActivity {
     private static final String TAG = "JumperChicken";
     private static final long RETRY_LOAD_DELAY_MS = 30_000;
+    private static final int RC_LEADERBOARD = 9001;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final AtomicBoolean mobileAdsStarted = new AtomicBoolean(false);
@@ -43,11 +45,21 @@ public class MainActivity extends NativeActivity {
     private boolean loadingAd = false;      // only touched on the main thread
     private volatile boolean adReady = false;
 
+    private static final int SIGN_IN_IDLE = 0;
+    private static final int SIGN_IN_RUNNING = 1;
+    private static final int SIGN_IN_FAILED = 2;
+
+    private volatile boolean gamesSignedIn = false;
+    private volatile int signInState = SIGN_IN_IDLE;
+    private volatile String playerName = "";
+    private long bestPendingScore = 0;      // only touched on the main thread
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         hideSystemBars();
         requestConsent();
+        if (JumperChickenApp.isPlayGamesConfigured(this)) checkGamesSignIn();
     }
 
     @Override
@@ -158,6 +170,74 @@ public class MainActivity extends NativeActivity {
         return consentInformation != null
                 && consentInformation.getPrivacyOptionsRequirementStatus()
                 == ConsentInformation.PrivacyOptionsRequirementStatus.REQUIRED;
+    }
+
+    // ---- Google Play Games leaderboard ----
+
+    private void checkGamesSignIn() {
+        // Play Games signs players in automatically when they have used it before
+        PlayGames.getGamesSignInClient(this).isAuthenticated().addOnCompleteListener(task ->
+                onGamesSignIn(task.isSuccessful() && task.getResult().isAuthenticated(), false));
+    }
+
+    private void onGamesSignIn(boolean signedIn, boolean openLeaderboard) {
+        gamesSignedIn = signedIn;
+        // A failed silent check at startup is normal; only a failed tap is reported to the player
+        signInState = signedIn || !openLeaderboard ? SIGN_IN_IDLE : SIGN_IN_FAILED;
+        if (!signedIn) return;
+        PlayGames.getPlayersClient(this).getCurrentPlayer()
+                .addOnSuccessListener(player -> playerName = player.getDisplayName());
+        if (bestPendingScore > 0) {
+            submitScoreNow(bestPendingScore);
+            bestPendingScore = 0;
+        }
+        if (openLeaderboard) openLeaderboard();
+    }
+
+    private void submitScoreNow(long score) {
+        PlayGames.getLeaderboardsClient(this).submitScore(getString(R.string.leaderboard_id), score);
+    }
+
+    private void openLeaderboard() {
+        PlayGames.getLeaderboardsClient(this).getLeaderboardIntent(getString(R.string.leaderboard_id))
+                .addOnSuccessListener(intent -> startActivityForResult(intent, RC_LEADERBOARD))
+                .addOnFailureListener(e -> Log.w(TAG, "Leaderboard: " + e.getMessage()));
+    }
+
+    public boolean isLeaderboardAvailable() {
+        return JumperChickenApp.isPlayGamesConfigured(this);
+    }
+
+    /** The player's Play Games name, or "" when not signed in. */
+    public String getPlayerName() {
+        return playerName;
+    }
+
+    /** 0 = idle, 1 = signing in, 2 = the last sign-in attempt failed. */
+    public int getSignInState() {
+        return signInState;
+    }
+
+    /** Play Games keeps the best score, so sending the highscore again is harmless. */
+    public void submitScore(long score) {
+        if (!isLeaderboardAvailable() || score <= 0) return;
+        mainHandler.post(() -> {
+            if (gamesSignedIn) submitScoreNow(score);
+            else bestPendingScore = Math.max(bestPendingScore, score);
+        });
+    }
+
+    public void showLeaderboard() {
+        if (!isLeaderboardAvailable()) return;
+        mainHandler.post(() -> {
+            if (gamesSignedIn) {
+                openLeaderboard();
+                return;
+            }
+            signInState = SIGN_IN_RUNNING;
+            PlayGames.getGamesSignInClient(this).signIn().addOnCompleteListener(task ->
+                    onGamesSignIn(task.isSuccessful() && task.getResult().isAuthenticated(), true));
+        });
     }
 
     public void showPrivacyOptions() {

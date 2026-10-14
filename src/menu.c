@@ -41,12 +41,16 @@ Rectangle MusicButtonRect() {
     return (Rectangle){ 24, 24, 190, 50 };
 }
 
+Rectangle LeaderboardButtonRect(int screenWidth) {
+    return (Rectangle){ screenWidth - 250, 24, 226, 50 };
+}
+
 Rectangle PrivacyButtonRect(int screenWidth, int screenHeight) {
     return (Rectangle){ screenWidth - 170, screenHeight - 64, 150, 44 };
 }
 
 void DrawMainMenu(int screenWidth, int screenHeight, int selected, Texture2D chickenTexture, int highscore, int coins, bool showPrivacy,
-                  bool musicOn) {
+                  bool musicOn, bool showLeaderboard, const char *playerName, int signInState) {
     int centerX = screenWidth / 2;
     float time = (float)GetTime();
 
@@ -83,6 +87,15 @@ void DrawMainMenu(int screenWidth, int screenHeight, int selected, Texture2D chi
 
     drawButton(MusicButtonRect(), musicOn ? "MUSIC: ON" : "MUSIC: OFF", 22, Fade(BLACK, musicOn ? 0.4f : 0.25f),
                musicOn ? 1.0f : 0.6f);
+    if (showLeaderboard) {
+        Rectangle button = LeaderboardButtonRect(screenWidth);
+        drawButton(button, "LEADERBOARD", 22, MENU_GREEN, 1.0f);
+        const char *status = "Tap to sign in";
+        if (playerName[0] != '\0') status = TextFormat("Hi, %s!", playerName);
+        else if (signInState == SIGN_IN_RUNNING) status = "Signing in...";
+        else if (signInState == SIGN_IN_FAILED) status = "Sign-in failed - tap to retry";
+        drawTextShadowCentered(status, (int)(button.x + button.width / 2), (int)(button.y + button.height + 8), 18, WHITE);
+    }
     if (showPrivacy) drawButton(PrivacyButtonRect(screenWidth, screenHeight), "PRIVACY", 20, Fade(BLACK, 0.4f), 1.0f);
 }
 

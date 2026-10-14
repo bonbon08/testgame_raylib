@@ -4,7 +4,7 @@
 #include <math.h>
 #include "Filerw.c"
 
-#define NUM_SPIKES 5
+#define MAX_SPIKES 7    // never more spikes on one wall, so there is always a way through
 #define SLOT_HEIGHT 64
 #define CHICKEN_SIZE 64
 
@@ -38,6 +38,7 @@ typedef struct Gamelogik{
     int highscore;
     int Coins;
     bool newHighscore;
+    int bounces;       // wall touches in this run, drives the difficulty
     bool usedRevive;   // a run can only be continued once
     bool startgame;
     int frameCounter;
@@ -53,8 +54,8 @@ typedef struct Menu {
 } Menu ;
 
 
-Spike lspikes[NUM_SPIKES];
-Spike rspikes[NUM_SPIKES];
+Spike lspikes[MAX_SPIKES];
+Spike rspikes[MAX_SPIKES];
 Coin maincoin;
 Player Chicken;
 Gamelogik Gamevars;
@@ -65,6 +66,7 @@ void Initgamevars() {
     Gamevars.highscore = 0;
     Gamevars.Coins = 0;
     Gamevars.newHighscore = false;
+    Gamevars.bounces = 0;
     Gamevars.usedRevive = false;
     Gamevars.startgame = false;
     Gamevars.frameCounter = 0;
@@ -77,6 +79,28 @@ void Initcolors() {
     Menuvars.quit = false;
     Menuvars.auswahl = 0;
     Menuvars.untermenu = 0;
+}
+
+// Difficulty: every 3 wall touches is a new level with one more spike, and the chicken
+// gets a bit faster with every touch
+#define BOUNCES_PER_LEVEL 3
+#define START_SPIKES 4
+#define START_SPEED 8.0f
+#define SPEED_PER_BOUNCE 0.3f
+#define MAX_SPEED 15.0f
+
+int GameLevel() {
+    return 1 + Gamevars.bounces / BOUNCES_PER_LEVEL;
+}
+
+int SpikeCount() {
+    int count = START_SPIKES + GameLevel() - 1;
+    return count < MAX_SPIKES ? count : MAX_SPIKES;
+}
+
+float ChickenSpeed() {
+    float speed = START_SPEED + Gamevars.bounces * SPEED_PER_BOUNCE;
+    return speed < MAX_SPEED ? speed : MAX_SPEED;
 }
 
 void generateSpikes(int screenWidth, int screenHeight, bool activateLeft) {
@@ -94,12 +118,13 @@ void generateSpikes(int screenWidth, int screenHeight, bool activateLeft) {
         allSlots[j] = temp;
     }
 
-    for (int i = 0; i < NUM_SPIKES; i++) {
+    int count = SpikeCount();
+    for (int i = 0; i < MAX_SPIKES; i++) {
         lspikes[i].pos = (Vector2){ 0, (float)(allSlots[i] * SLOT_HEIGHT) };
-        lspikes[i].active = activateLeft;
+        lspikes[i].active = activateLeft && i < count;
 
         rspikes[i].pos = (Vector2){ (float)(screenWidth), (float)(allSlots[i] * SLOT_HEIGHT) };
-        rspikes[i].active = !activateLeft;
+        rspikes[i].active = !activateLeft && i < count;
     }
 
     free(allSlots);
@@ -119,7 +144,7 @@ void InitSpikes(int screenWidth, int screenHeight) {
     spikeRightTex = LoadTextureFromImage(spiker);
     UnloadImage(spiker);
 
-    for (int i = 0; i < NUM_SPIKES; i++){
+    for (int i = 0; i < MAX_SPIKES; i++){
         lspikes[i].spiketexture = spikeLeftTex;
         rspikes[i].spiketexture = spikeRightTex;
     }

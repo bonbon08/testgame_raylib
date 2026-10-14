@@ -35,6 +35,10 @@ android {
     ndkVersion = "29.0.14206865"
 
     defaultConfig {
+        // Google Play Games leaderboard; without these IDs the leaderboard button is hidden
+        resValue("string", "play_games_app_id", property("jumperchicken.playGamesAppId") ?: "")
+        resValue("string", "leaderboard_id", property("jumperchicken.leaderboardId") ?: "")
+
         applicationId = "io.github.bonbon08.jumperchicken"
         minSdk = 24
         targetSdk = 36
@@ -97,4 +101,5 @@ androidComponents {
 dependencies {
     implementation("com.google.android.gms:play-services-ads:25.5.0")
     implementation("com.google.android.ump:user-messaging-platform:4.0.0")
+    implementation("com.google.android.gms:play-services-games-v2:22.1.0")
 }
