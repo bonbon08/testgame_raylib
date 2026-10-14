@@ -4,6 +4,8 @@
 
 #define NUM_CLOUDS 7
 #define NUM_HILLS 6
+#define NUM_STARS 70
+#define NUM_THEMES 4
 
 typedef struct Cloud {
     Vector2 pos;
@@ -16,14 +18,34 @@ typedef struct Hill {
     float radius;
 } Hill;
 
+typedef struct Theme {
+    const char *name;
+    int price;
+    Color skyTop;
+    Color skyBottom;
+    Color sun;
+    Color cloud;
+    Color farHill;
+    Color nearHill;
+    float sunY;
+    bool night;
+} Theme;
+
+Theme themes[NUM_THEMES] = {
+    { "Day",    0,   { 72, 152, 235, 255 }, { 186, 226, 255, 255 }, { 255, 228, 110, 255 },
+      { 244, 249, 255, 255 }, { 132, 196, 214, 255 }, { 104, 178, 150, 255 }, 120, false },
+    { "Sunset", 30,  { 64, 48, 120, 255 },  { 255, 160, 100, 255 }, { 255, 120, 60, 255 },
+      { 255, 196, 190, 255 }, { 170, 90, 120, 255 },  { 110, 60, 100, 255 },  470, false },
+    { "Night",  60,  { 8, 12, 36, 255 },    { 36, 54, 104, 255 },   { 236, 236, 214, 255 },
+      { 60, 72, 120, 255 },   { 32, 48, 92, 255 },    { 20, 32, 66, 255 },    110, true },
+    { "Candy",  120, { 255, 160, 215, 255 }, { 190, 235, 255, 255 }, { 255, 255, 255, 255 },
+      { 255, 255, 255, 255 }, { 170, 235, 210, 255 }, { 255, 190, 225, 255 }, 120, false },
+};
+
 Cloud clouds[NUM_CLOUDS];
 Hill farHills[NUM_HILLS];
 Hill nearHills[NUM_HILLS];
-
-const Color SKY_TOP = { 72, 152, 235, 255 };
-const Color SKY_BOTTOM = { 186, 226, 255, 255 };
-const Color FAR_HILL_COLOR = { 132, 196, 214, 255 };
-const Color NEAR_HILL_COLOR = { 104, 178, 150, 255 };
+Vector2 stars[NUM_STARS];
 
 void resetCloud(Cloud *cloud, int screenWidth, int screenHeight, bool randomX) {
     cloud->scale = 0.6f + (rand() % 100) / 100.0f;
@@ -42,6 +64,10 @@ void InitBackground(int screenWidth, int screenHeight) {
         nearHills[i].radius = 180.0f + rand() % 60;
         nearHills[i].center = (Vector2){ i * spacing + spacing / 2.0f, screenHeight + 110.0f };
     }
+
+    for (int i = 0; i < NUM_STARS; i++) {
+        stars[i] = (Vector2){ (float)(rand() % screenWidth), (float)(rand() % (screenHeight * 2 / 3)) };
+    }
 }
 
 void UpdateBackground(int screenWidth, int screenHeight) {
@@ -53,26 +79,61 @@ void UpdateBackground(int screenWidth, int screenHeight) {
     }
 }
 
-void drawCloud(Cloud cloud) {
+void drawCloud(Cloud cloud, Color c) {
     float s = cloud.scale;
-    Color c = { 244, 249, 255, 255 };
     DrawCircleV((Vector2){ cloud.pos.x, cloud.pos.y + 10 * s }, 34 * s, c);
     DrawCircleV((Vector2){ cloud.pos.x + 38 * s, cloud.pos.y - 8 * s }, 44 * s, c);
     DrawCircleV((Vector2){ cloud.pos.x + 82 * s, cloud.pos.y + 6 * s }, 36 * s, c);
     DrawRectangleRounded((Rectangle){ cloud.pos.x - 20 * s, cloud.pos.y + 6 * s, 124 * s, 38 * s }, 1.0f, 8, c);
 }
 
-void DrawBackground(int screenWidth, int screenHeight) {
-    DrawRectangleGradientV(0, 0, screenWidth, screenHeight, SKY_TOP, SKY_BOTTOM);
+void DrawBackground(int screenWidth, int screenHeight, Theme theme) {
+    float time = (float)GetTime();
+    DrawRectangleGradientV(0, 0, screenWidth, screenHeight, theme.skyTop, theme.skyBottom);
 
-    Vector2 sun = { screenWidth - 150.0f, 120.0f };
-    float glow = 6.0f * sinf((float)GetTime() * 1.5f);
-    DrawCircleV(sun, 90 + glow, Fade((Color){ 255, 240, 170, 255 }, 0.25f));
-    DrawCircleV(sun, 66 + glow / 2, Fade((Color){ 255, 236, 150, 255 }, 0.45f));
-    DrawCircleV(sun, 48, (Color){ 255, 228, 110, 255 });
+    if (theme.night) {
+        for (int i = 0; i < NUM_STARS; i++) {
+            float twinkle = 0.5f + 0.5f * sinf(time * 2.0f + i * 1.7f);
+            DrawRectangleV(stars[i], (Vector2){ 2 + (i % 3 == 0), 2 + (i % 3 == 0) }, Fade(WHITE, 0.3f + 0.7f * twinkle));
+        }
+    }
 
-    for (int i = 0; i < NUM_CLOUDS; i++) drawCloud(clouds[i]);
+    Vector2 sun = { screenWidth - 150.0f, theme.sunY };
+    float glow = 6.0f * sinf(time * 1.5f);
+    float glowAlpha = theme.night ? 0.06f : 0.2f;   // the moon only glows faintly
+    DrawCircleV(sun, 90 + glow, Fade(theme.sun, glowAlpha));
+    DrawCircleV(sun, 66 + glow / 2, Fade(theme.sun, 2 * glowAlpha));
+    DrawCircleV(sun, 48, theme.sun);
+    if (theme.night) {
+        // a few craters turn the sun into a moon
+        Color crater = { 206, 206, 186, 255 };
+        DrawCircleV((Vector2){ sun.x - 14, sun.y - 10 }, 10, crater);
+        DrawCircleV((Vector2){ sun.x + 16, sun.y + 12 }, 7, crater);
+        DrawCircleV((Vector2){ sun.x + 6, sun.y - 22 }, 5, crater);
+    }
 
-    for (int i = 0; i < NUM_HILLS; i++) DrawCircleV(farHills[i].center, farHills[i].radius, FAR_HILL_COLOR);
-    for (int i = 0; i < NUM_HILLS; i++) DrawCircleV(nearHills[i].center, nearHills[i].radius, NEAR_HILL_COLOR);
+    for (int i = 0; i < NUM_CLOUDS; i++) drawCloud(clouds[i], theme.cloud);
+
+    for (int i = 0; i < NUM_HILLS; i++) DrawCircleV(farHills[i].center, farHills[i].radius, theme.farHill);
+    for (int i = 0; i < NUM_HILLS; i++) DrawCircleV(nearHills[i].center, nearHills[i].radius, theme.nearHill);
+}
+
+// Small static version of a theme, used for the shop cards
+void DrawThemePreview(Theme theme, Rectangle area, int screenHeight) {
+    BeginScissorMode((int)area.x, (int)area.y, (int)area.width, (int)area.height);
+    DrawRectangleGradientV((int)area.x, (int)area.y, (int)area.width, (int)area.height, theme.skyTop, theme.skyBottom);
+    if (theme.night) {
+        for (int i = 0; i < 12; i++) {
+            DrawRectangle((int)(area.x + (i * 37) % (int)area.width), (int)(area.y + (i * 23) % (int)(area.height / 2)), 2, 2, WHITE);
+        }
+    }
+    Vector2 sun = { area.x + area.width * 0.75f, area.y + area.height * theme.sunY / screenHeight };
+    DrawCircleV(sun, 16, Fade(theme.sun, 0.35f));
+    DrawCircleV(sun, 10, theme.sun);
+    DrawCircleV((Vector2){ area.x + area.width * 0.3f, area.y + area.height * 0.3f }, 9, theme.cloud);
+    DrawCircleV((Vector2){ area.x + area.width * 0.3f + 12, area.y + area.height * 0.3f - 3 }, 11, theme.cloud);
+    DrawCircleV((Vector2){ area.x + area.width * 0.2f, area.y + area.height + 30 }, 60, theme.farHill);
+    DrawCircleV((Vector2){ area.x + area.width * 0.85f, area.y + area.height + 34 }, 58, theme.farHill);
+    DrawCircleV((Vector2){ area.x + area.width * 0.55f, area.y + area.height + 40 }, 56, theme.nearHill);
+    EndScissorMode();
 }
