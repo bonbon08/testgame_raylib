@@ -3,10 +3,33 @@
 #include <string.h>
 #include <stdbool.h>
 
+#if defined(PLATFORM_WEB)
+// In the browser the save folder is kept in IndexedDB, see the helpers below
+#define SAVE_FILE "save/save.txt"
+#define SAVE_TMP_FILE "save/save.tmp"
+#else
 #define SAVE_FILE "data/save.txt"
 #define SAVE_TMP_FILE "data/save.tmp"
+#endif
 #define LEGACY_HIGHSCORE_FILE "data/hscore.txt"
 #define LEGACY_COINS_FILE "data/coins.txt"
+
+#if defined(PLATFORM_WEB)
+#include <emscripten.h>
+
+// Mounts /save as IndexedDB-backed folder and starts loading it (asynchronous)
+EM_JS(void, mountSaveFolder, (), {
+    FS.mkdir('/save');
+    FS.mount(IDBFS, {}, '/save');
+    Module.saveFolderReady = 0;
+    FS.syncfs(true, function (err) { Module.saveFolderReady = 1; });
+});
+
+EM_JS(int, saveFolderReady, (), { return Module.saveFolderReady; });
+
+// Writes the in-memory save folder back to IndexedDB
+EM_JS(void, flushSaveFolder, (), { FS.syncfs(false, function (err) {}); });
+#endif
 
 typedef struct SaveData {
     int highscore;

@@ -15,6 +15,9 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #endif
+#if defined(PLATFORM_WEB)
+#include <emscripten.h>
+#endif
 
 #define DEATH_ANIMATION_FRAMES 70
 #define DEATH_FADE_FRAMES 20
@@ -26,6 +29,8 @@ void prepareSaveDirectory() {
 #if defined(PLATFORM_ANDROID)
     if (chdir(GetAndroidApp()->activity->internalDataPath) != 0) TraceLog(LOG_WARNING, "Could not open internal storage");
     mkdir("data", 0700);
+#elif defined(PLATFORM_WEB)
+    mountSaveFolder();   // loads asynchronously, see gameFrame()
 #else
     // Started from a file manager or the itch.io app the working directory can be anywhere,
     // but data/ always lies next to the executable
@@ -211,14 +216,14 @@ void updateMenu() {
         return;
     }
     if (IsKeyPressed(KEY_X)) selectMenuOption(Menuvars.auswahl);
-    else if (IsKeyPressed(KEY_UP)) Menuvars.auswahl = (Menuvars.auswahl - 1 + MENU_OPTIONS) % MENU_OPTIONS;
-    else if (IsKeyPressed(KEY_DOWN)) Menuvars.auswahl = (Menuvars.auswahl + 1) % MENU_OPTIONS;
+    else if (IsKeyPressed(KEY_UP)) Menuvars.auswahl = (Menuvars.auswahl - 1 + MenuOptionCount()) % MenuOptionCount();
+    else if (IsKeyPressed(KEY_DOWN)) Menuvars.auswahl = (Menuvars.auswahl + 1) % MenuOptionCount();
     else if (PrivacyOptionsRequired() && PointerPressedIn(PrivacyButtonRect(Gamevars.screenWidth, Gamevars.screenHeight))) {
         ShowPrivacyOptions();
     } else if (LeaderboardAvailable() && PointerPressedIn(LeaderboardButtonRect(Gamevars.screenWidth))) {
         ShowLeaderboard();   // signs the player in first if needed
     } else {
-        for (int i = 0; i < MENU_OPTIONS; i++) {
+        for (int i = 0; i < MenuOptionCount(); i++) {
             if (!PointerPressedIn(MenuOptionRect(i, Gamevars.screenWidth))) continue;
             Menuvars.auswahl = i;
             selectMenuOption(i);
@@ -299,6 +304,44 @@ void drawFrame() {
     EndVirtualScreen();
 }
 
+bool saveLoaded = false;
+
+// Everything that depends on the save file
+void loadSaveAndServices() {
+    LoadGame();
+    InitAds();
+    SubmitLeaderboardScore(Gamevars.highscore);   // uploads a highscore from before the leaderboard existed
+    InitGameAudio(Shopvars.equipped[ROW_MUSIC], Shopvars.musicOn);
+    saveLoaded = true;
+}
+
+// One frame of the game: update and draw
+void gameFrame() {
+#if defined(PLATFORM_WEB)
+    // In the browser the save folder arrives asynchronously from IndexedDB
+    if (!saveLoaded) {
+        if (!saveFolderReady()) {
+            BeginDrawing();
+            ClearBackground((Color){ 11, 22, 48, 255 });
+            DrawText("Loading...", 20, 20, 20, MENU_GOLD);
+            EndDrawing();
+            return;
+        }
+        loadSaveAndServices();
+    }
+#endif
+    UpdateBackground(Gamevars.screenWidth, Gamevars.screenHeight);
+    UpdateEffects();
+    applyAdRewards();
+    UpdateGameAudio(PreviewedTrack(), MusicAudible());
+
+    if (!Chicken.dead && Gamevars.startgame) updateGameplay();
+    else if (Menuvars.enabled) updateMenu();
+    else updateDeath();
+
+    drawFrame();
+}
+
 int main(void)
 {
     Initgamevars();
@@ -306,39 +349,35 @@ int main(void)
     else InitWindow(Gamevars.screenWidth, Gamevars.screenHeight, "Jumper Chicken");
     InitVirtualScreen(&Gamevars.screenWidth, &Gamevars.screenHeight);
     InitAudioDevice();
-    SetTargetFPS(60);
+#if !defined(PLATFORM_WEB)
+    SetTargetFPS(60);   // in the browser emscripten_set_main_loop() sets the pace
+#endif
     srand(time(NULL));
 
     prepareSaveDirectory();
+#if !defined(PLATFORM_WEB)
     if (!IS_MOBILE) {
         Image icon = LoadImage("data/Chicken.png");
         SetWindowIcon(icon);
         UnloadImage(icon);
     }
-    LoadGame();
-    InitAds();
-    SubmitLeaderboardScore(Gamevars.highscore);   // uploads a highscore from before the leaderboard existed
+#endif
     Initplayer(Gamevars.screenWidth, Gamevars.screenHeight);
     InitSpikes(Gamevars.screenWidth, Gamevars.screenHeight);
     Initcolors();
     InitCoin();
     InitCharacters();
     InitBackground(Gamevars.screenWidth, Gamevars.screenHeight);
-    InitGameAudio(Shopvars.equipped[ROW_MUSIC], Shopvars.musicOn);
+#if !defined(PLATFORM_WEB)
+    loadSaveAndServices();
+#endif
 
-    while (!WindowShouldClose() && !Menuvars.quit)
-    {
-        UpdateBackground(Gamevars.screenWidth, Gamevars.screenHeight);
-        UpdateEffects();
-        applyAdRewards();
-        UpdateGameAudio(PreviewedTrack(), MusicAudible());
-
-        if (!Chicken.dead && Gamevars.startgame) updateGameplay();
-        else if (Menuvars.enabled) updateMenu();
-        else updateDeath();
-
-        drawFrame();
-    }
+#if defined(PLATFORM_WEB)
+    // The browser calls gameFrame 60 times a second; this call never returns
+    emscripten_set_main_loop(gameFrame, 60, 1);
+#else
+    while (!WindowShouldClose() && !Menuvars.quit) gameFrame();
+#endif
 
     SaveGame();
 

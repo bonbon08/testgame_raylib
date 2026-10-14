@@ -124,6 +124,9 @@ void SaveGame() {
         .musicOn = Shopvars.musicOn,
     };
     if (!WriteSave(&save)) TraceLog(LOG_WARNING, "Could not write save file %s", SAVE_FILE);
+#if defined(PLATFORM_WEB)
+    flushSaveFolder();
+#endif
 }
 
 Rectangle shopCardRect(int row, int col, int screenWidth) {

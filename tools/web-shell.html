@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jumper Chicken</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b1630; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; }
+  canvas { display: block; max-width: 100vw; max-height: 100vh; aspect-ratio: 3 / 2; outline: none;
+           image-rendering: pixelated; }
+  #status { position: absolute; color: #ffd640; font: bold 22px monospace; text-align: center; }
+</style>
+</head>
+<body>
+<canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+<div id="status">Loading...</div>
+<script>
+  var statusElement = document.getElementById('status');
+  var canvas = document.getElementById('canvas');
+  var Module = {
+    canvas: canvas,
+    print: function (text) { console.log(text); },
+    printErr: function (text) { console.warn(text); },
+    setStatus: function (text) { statusElement.textContent = text || ''; statusElement.style.display = text ? 'block' : 'none'; },
+    onRuntimeInitialized: function () { canvas.focus(); }
+  };
+  // Keyboard input only reaches the game while the canvas has focus (important inside the itch.io frame)
+  canvas.addEventListener('pointerdown', function () { canvas.focus(); });
+  window.addEventListener('keydown', function (e) {
+    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Backspace'].includes(e.code)) e.preventDefault();
+  });
+</script>
+{{{ SCRIPT }}}
+</body>
+</html>

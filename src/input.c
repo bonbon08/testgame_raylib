@@ -11,6 +11,16 @@
 
 #define MIN_VIRTUAL_WIDTH 960
 
+#if defined(PLATFORM_WEB)
+#include <emscripten.h>
+// The page may show the canvas smaller or bigger than its real size (CSS scaling, fullscreen);
+// mouse positions arrive in CSS pixels, so they need this factor
+EM_JS(float, canvasCssScale, (), {
+    var canvas = Module.canvas;
+    return canvas.clientWidth > 0 ? canvas.width / canvas.clientWidth : 1;
+});
+#endif
+
 // The game is drawn into a texture with a fixed height and then scaled to the real screen
 typedef struct VirtualScreen {
     RenderTexture2D target;
@@ -72,6 +82,11 @@ bool PointerPressed() {
 Vector2 PointerPosition() {
 #if defined(PLATFORM_ANDROID)
     Vector2 pos = GetTouchPosition(0);
+#elif defined(PLATFORM_WEB)
+    Vector2 pos = GetMousePosition();
+    float cssScale = canvasCssScale();
+    pos.x *= cssScale;
+    pos.y *= cssScale;
 #else
     Vector2 pos = GetMousePosition();
 #endif

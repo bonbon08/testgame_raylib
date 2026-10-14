@@ -8,6 +8,15 @@
 
 const char *menuOptions[MENU_OPTIONS] = { "START", "SHOP", "EXIT" };
 
+// A browser tab can't be closed by the game, so the web version has no EXIT entry
+int MenuOptionCount() {
+#if defined(PLATFORM_WEB)
+    return MENU_OPTIONS - 1;
+#else
+    return MENU_OPTIONS;
+#endif
+}
+
 const Color MENU_ORANGE = { 255, 140, 40, 255 };
 const Color MENU_GOLD = { 255, 214, 64, 255 };
 const Color MENU_GREEN = { 80, 190, 110, 255 };
@@ -65,7 +74,7 @@ void DrawMainMenu(int screenWidth, int screenHeight, int selected, Texture2D chi
     Rectangle panel = menuPanelRect(screenWidth);
     DrawRectangleRounded(panel, 0.2f, 12, Fade(BLACK, 0.25f));
 
-    for (int i = 0; i < MENU_OPTIONS; i++) {
+    for (int i = 0; i < MenuOptionCount(); i++) {
         Rectangle option = MenuOptionRect(i, screenWidth);
         int textY = (int)option.y + 11;
         if (i == selected) {

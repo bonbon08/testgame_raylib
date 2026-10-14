@@ -91,3 +91,56 @@ jobs:
         with:
           name: JumperChicken-Android-Debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+  macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Build (Apple Silicon + Intel)
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+          cmake --build build --config Release
+
+      - name: Bundle JumperChicken.app
+        run: |
+          APP=JumperChicken.app
+          mkdir -p $APP/Contents/MacOS/data $APP/Contents/Resources
+          cp build/spiel $APP/Contents/MacOS/JumperChicken
+          # the game looks for data/ next to its executable
+          cp data/*.png data/*.wav $APP/Contents/MacOS/data/
+          mkdir icon.iconset
+          for size in 16 32 128 256 512; do
+            sips -z $size $size store/icon-512.png --out icon.iconset/icon_${size}x${size}.png > /dev/null
+            sips -z $((size*2)) $((size*2)) store/icon-512.png --out icon.iconset/icon_${size}x${size}@2x.png > /dev/null
+          done
+          iconutil -c icns icon.iconset -o $APP/Contents/Resources/icon.icns
+          cat > $APP/Contents/Info.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleName</key><string>Jumper Chicken</string>
+            <key>CFBundleDisplayName</key><string>Jumper Chicken</string>
+            <key>CFBundleIdentifier</key><string>io.github.bonbon08.jumperchicken</string>
+            <key>CFBundleVersion</key><string>1.0</string>
+            <key>CFBundleShortVersionString</key><string>1.0</string>
+            <key>CFBundleExecutable</key><string>JumperChicken</string>
+            <key>CFBundleIconFile</key><string>icon</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>LSMinimumSystemVersion</key><string>11.0</string>
+            <key>NSHighResolutionCapable</key><true/>
+          </dict>
+          </plist>
+          PLIST
+          # ad-hoc signature, required to run on Apple Silicon
+          codesign --force --deep --sign - $APP
+          ditto -c -k --keepParent $APP JumperChicken-macos.zip
+
+      - name: Upload macOS build
+        uses: actions/upload-artifact@v4
+        with:
+          name: JumperChicken-macOS
+          path: JumperChicken-macos.zip

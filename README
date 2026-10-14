@@ -61,9 +61,12 @@ The full publishing checklist (in German), store graphics and listing texts are 
 
 ### itch.io
 
-`tools/build-desktop.sh` builds portable Windows and Linux zips into `dist/` (needs
-[Zig](https://ziglang.org) as cross compiler). `-Pjumperchicken.adsEnabled=false` builds an
-ad-free Android APK. Page texts, cover, trailer and price notes are in `store/itch/`.
+- `tools/build-desktop.sh`: portable Windows and Linux zips (needs [Zig](https://ziglang.org))
+- `tools/build-web.sh`: browser version (needs [Emscripten](https://emscripten.org))
+- `tools/build-android-itch.sh`: ad-free signed APK (`-Pjumperchicken.adsEnabled=false`)
+- macOS: built by GitHub Actions as `JumperChicken.app`
+
+Everything ends up in `dist/`. Page texts, cover, trailer and price notes are in `store/itch/`.
 
 Never tap your own real ads; AdMob bans accounts for that. Use the debug build for testing.
 

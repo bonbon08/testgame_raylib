@@ -2,37 +2,58 @@
 
 ## Dateien
 
-| Datei | Wo auf itch.io |
+Fertig zum Hochladen (alles in `dist/`):
+
+| Datei | Auf itch.io |
+|---|---|
+| `JumperChicken-web.zip` | Upload, Haken bei **„This file will be played in the browser“** |
+| `JumperChicken-windows.zip` | Upload, Haken bei **Windows** |
+| `JumperChicken-linux.zip` | Upload, Haken bei **Linux** |
+| `JumperChicken-android.apk` | Upload, Haken bei **Android** (werbefrei, signiert) |
+| `JumperChicken-macos.zip` | kommt aus GitHub Actions (siehe unten), Haken bei **macOS** |
+
+Bilder und Video (in diesem Ordner):
+
+| Datei | Auf itch.io |
 |---|---|
 | `itch-cover.png` (630×500) | *Cover image* |
-| `trailer.mp4` (37 s, 1280×720, mit Ton) | Auf YouTube hochladen, Link bei *Gameplay video or trailer* eintragen (itch.io bettet nur YouTube/Vimeo ein) |
-| `gameplay.gif` | *Screenshots* (GIFs werden animiert angezeigt) |
-| `../screenshots/*.png` | *Screenshots* |
-| `dist/JumperChicken-windows.zip` | *Uploads*, Haken bei **Windows** |
-| `dist/JumperChicken-linux.zip` | *Uploads*, Haken bei **Linux** |
-| `JumperChicken-android.apk` (selbst bauen, siehe unten) | *Uploads*, Haken bei **Android** |
+| `trailer.mp4` (37 s, 720p, Stereo) | Auf YouTube hochladen, Link bei *Gameplay video or trailer* (itch.io bettet nur YouTube/Vimeo ein) |
+| `gameplay.gif` und `../screenshots/*.png` | *Screenshots* |
+| `itch-text.txt` | Kurztext und Seitentext zum Einfügen |
 
-Die beiden Zips baust du mit:
+**Browser-Version (Embed options):** *Viewport dimensions* 1080 × 720, Haken bei
+*Fullscreen button*, *Mobile friendly* (Querformat). Der Spielstand wird im Browser
+gespeichert und bleibt nach dem Neuladen erhalten.
+
+### Neu bauen
 
 ```bash
-ZIG=/pfad/zu/zig tools/build-desktop.sh
+ZIG=/pfad/zu/zig tools/build-desktop.sh      # Windows + Linux
+EMSDK=/pfad/zu/emsdk tools/build-web.sh      # Browser
+tools/build-android-itch.sh                  # Android, werbefrei
 ```
 
-Das Android-APK für itch.io ist **werbefrei** und muss mit deinem eigenen Schlüssel signiert
-werden (derselbe Upload-Schlüssel wie für Google Play, siehe `store/README.md`):
+Das Android-APK wird mit dem Schlüssel aus `~/.jumperchicken/` signiert. **Diesen Ordner
+sichern** (z. B. auf einen USB-Stick oder in den Passwortmanager) – ohne ihn kannst du
+keine Updates veröffentlichen, die sich über die alte Version installieren lassen.
+
+### macOS
+
+Ein Mac-Build lässt sich nur auf einem Mac erstellen. Das übernimmt GitHub Actions: nach
+dem Push unter *Actions → letzter Lauf → Artifacts* `JumperChicken-macOS` herunterladen,
+das enthaltene `JumperChicken-macos.zip` hochladen. Weil die App nicht bei Apple
+notarisiert ist (dafür bräuchte man ein Apple-Entwicklerkonto für 99 $/Jahr), müssen
+Mac-Spieler sie beim ersten Start per **Rechtsklick → Öffnen** starten. Schreib das in
+die Beschreibung.
+
+Optional mit [butler](https://itch.io/docs/butler/) hochladen (Spieler bekommen dann
+automatisch Updates über die itch-App):
 
 ```bash
-cd android && ./gradlew assembleRelease -Pjumperchicken.adsEnabled=false
-cp app/build/outputs/apk/release/app-release.apk ../dist/JumperChicken-android.apk
-```
-
-Optional kannst du mit [butler](https://itch.io/docs/butler/) hochladen, dann bekommen
-Spieler über die itch-App automatisch Updates:
-
-```bash
-butler push dist/JumperChicken-windows.zip DEINNAME/jumper-chicken:windows --userversion 1.0
-butler push dist/JumperChicken-linux.zip DEINNAME/jumper-chicken:linux --userversion 1.0
-butler push dist/JumperChicken-android.apk DEINNAME/jumper-chicken:android --userversion 1.0
+butler push dist/JumperChicken-web.zip DEINNAME/jumper-chicken:html
+butler push dist/JumperChicken-windows.zip DEINNAME/jumper-chicken:windows
+butler push dist/JumperChicken-linux.zip DEINNAME/jumper-chicken:linux
+butler push dist/JumperChicken-android.apk DEINNAME/jumper-chicken:android
 ```
 
 ## Einstellungen auf der Projektseite
@@ -43,7 +64,7 @@ butler push dist/JumperChicken-android.apk DEINNAME/jumper-chicken:android --use
 | Project URL | `jumper-chicken` |
 | Short description / tagline | Bounce from wall to wall, dodge the spikes, collect coins! |
 | Classification | Games |
-| Kind of project | Downloadable |
+| Kind of project | HTML (Browser-Version + Downloads) |
 | Release status | Released |
 | Pricing | siehe Preisempfehlung unten |
 | Genre | Action |
@@ -67,7 +88,7 @@ butler push dist/JumperChicken-android.apk DEINNAME/jumper-chicken:android --use
 > - Collect coins and unlock 5 chickens, 4 backgrounds and 4 music tracks
 > - Day, sunset, starry night and candy worlds
 > - Original chiptune soundtrack, synthesized live in the game
-> - Windows, Linux and an ad-free Android version
+> - Play in the browser, or download for Windows, macOS, Linux and an ad-free Android version
 >
 > **Controls (PC)**
 > - X / Space / mouse click: jump

@@ -1,0 +1,23 @@
+=== Short description / tagline (itch.io field, max. ~100 characters) ===
+
+Bounce from wall to wall, dodge the spikes and collect coins!
+
+
+=== Page text (short, English) ===
+
+Tap or press a key to jump – your chicken bounces from wall to wall, and every wall is full of spikes. It gets faster with every bounce. How far can you get?
+
+Collect coins to unlock new chickens, backgrounds and chiptune tracks.
+
+Controls: X / Space / click to jump · arrow keys + X in menus · M toggles music
+Play it in your browser or download it for Windows, Linux or Android (ad-free).
+
+
+=== Seitentext (kurz, Deutsch) ===
+
+Tippen oder Taste drücken zum Springen – dein Huhn hüpft von Wand zu Wand, und jede Wand ist voller Stacheln. Mit jedem Sprung wird es schneller. Wie weit kommst du?
+
+Sammle Münzen und schalte neue Hühner, Hintergründe und Chiptune-Musik frei.
+
+Steuerung: X / Leertaste / Klick zum Springen · Pfeiltasten + X im Menü · M schaltet die Musik um
+Direkt im Browser spielen oder für Windows, Linux und Android (werbefrei) herunterladen.
