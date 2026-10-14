@@ -29,6 +29,7 @@ typedef struct Player{
     float rotation;
     float squash;      // > 0 stretches the chicken (jump), < 0 flattens it (landing)
     int deathTimer;
+    int invulnerable;  // frames left without spike collisions (after a revive)
     bool dead;
 } Player;
 
@@ -37,6 +38,7 @@ typedef struct Gamelogik{
     int highscore;
     int Coins;
     bool newHighscore;
+    bool usedRevive;   // a run can only be continued once
     bool startgame;
     int frameCounter;
     int screenWidth;
@@ -63,6 +65,7 @@ void Initgamevars() {
     Gamevars.highscore = 0;
     Gamevars.Coins = 0;
     Gamevars.newHighscore = false;
+    Gamevars.usedRevive = false;
     Gamevars.startgame = false;
     Gamevars.frameCounter = 0;
     Gamevars.screenWidth = 1080;
@@ -162,15 +165,16 @@ void Initplayer(int screenWidth, int screenHeight){
     Chicken.rotation = 0.0f;
     Chicken.squash = 0.0f;
     Chicken.deathTimer = 0;
+    Chicken.invulnerable = 0;
     Chicken.dead = false;
 }
 
-void DrawChicken(Texture2D texture) {
+void DrawChicken(Texture2D texture, Color tint) {
     float scaleX = 1.0f - 0.25f * Chicken.squash;
     float scaleY = 1.0f + 0.25f * Chicken.squash;
 
     Rectangle source = { 0, 0, (float)texture.width, (float)texture.height };
     Rectangle dest = { Chicken.pos.x + CHICKEN_SIZE / 2.0f, Chicken.pos.y + CHICKEN_SIZE / 2.0f,
                        CHICKEN_SIZE * scaleX, CHICKEN_SIZE * scaleY };
-    DrawTexturePro(texture, source, dest, (Vector2){ dest.width / 2, dest.height / 2 }, Chicken.rotation, WHITE);
+    DrawTexturePro(texture, source, dest, (Vector2){ dest.width / 2, dest.height / 2 }, Chicken.rotation, tint);
 }
