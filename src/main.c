@@ -4,7 +4,7 @@
 #include <time.h>
 #include "objects.c"
 #include "input.c"
-#include "ads.c"
+#include "services.c"
 #include "audio.c"
 #include "background.c"
 #include "effects.c"
@@ -60,6 +60,7 @@ void KillChicken() {
     Chicken.velocityY = -11.0f;   // a little hop before falling off the screen
     updateHighscore();
     SaveGame();
+    SubmitLeaderboardScore(Gamevars.highscore);
     StartShake(10.0f, 20);
     Vector2 center = { Chicken.pos.x + CHICKEN_SIZE / 2.0f, Chicken.pos.y + CHICKEN_SIZE / 2.0f };
     SpawnParticles(center, 24, characters[Shopvars.equipped[ROW_CHARACTERS]].body, 6.0f, 7.0f);
@@ -115,6 +116,7 @@ void updateGameplay() {
         // Leaving a run keeps the collected coins and the highscore
         updateHighscore();
         SaveGame();
+        SubmitLeaderboardScore(Gamevars.highscore);
         BackToMenu();
         return;
     }
@@ -209,6 +211,8 @@ void updateMenu() {
     else if (IsKeyPressed(KEY_DOWN)) Menuvars.auswahl = (Menuvars.auswahl + 1) % MENU_OPTIONS;
     else if (PrivacyOptionsRequired() && PointerPressedIn(PrivacyButtonRect(Gamevars.screenWidth, Gamevars.screenHeight))) {
         ShowPrivacyOptions();
+    } else if (LeaderboardAvailable() && PointerPressedIn(LeaderboardButtonRect(Gamevars.screenWidth))) {
+        ShowLeaderboard();   // signs the player in first if needed
     } else {
         for (int i = 0; i < MENU_OPTIONS; i++) {
             if (!PointerPressedIn(MenuOptionRect(i, Gamevars.screenWidth))) continue;
@@ -270,7 +274,7 @@ void drawFrame() {
         if (Menuvars.untermenu == 0) {
             DrawMainMenu(Gamevars.screenWidth, Gamevars.screenHeight, Menuvars.auswahl,
                          CurrentCharacterTexture(0), Gamevars.highscore, Gamevars.Coins, PrivacyOptionsRequired(),
-                         Shopvars.musicOn);
+                         Shopvars.musicOn, LeaderboardAvailable(), PlayerName(), SignInState());
         } else {
             DrawShop(Gamevars.screenWidth, Gamevars.screenHeight);
         }
@@ -304,6 +308,7 @@ int main(void)
     prepareSaveDirectory();
     LoadGame();
     InitAds();
+    SubmitLeaderboardScore(Gamevars.highscore);   // uploads a highscore from before the leaderboard existed
     Initplayer(Gamevars.screenWidth, Gamevars.screenHeight);
     InitSpikes(Gamevars.screenWidth, Gamevars.screenHeight);
     Initcolors();

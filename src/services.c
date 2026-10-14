@@ -1,8 +1,9 @@
 #include "raylib.h"
 #include <stdbool.h>
+#include <stdio.h>
 
-// Rewarded video ads. On Android the calls go to MainActivity.java (Google AdMob),
-// on desktop there are no ads and all functions do nothing.
+// Android services: rewarded video ads (Google AdMob) and the leaderboard (Google Play Games).
+// On Android the calls go to MainActivity.java, on desktop all functions do nothing.
 
 typedef enum RewardType {
     REWARD_NONE,
@@ -13,6 +14,12 @@ typedef enum RewardType {
 #define AD_REWARD_COINS 10
 
 RewardType pendingReward = REWARD_NONE;
+char playerName[64] = "";
+int playerNameCheck = 0;
+
+#define SIGN_IN_IDLE 0
+#define SIGN_IN_RUNNING 1
+#define SIGN_IN_FAILED 2
 
 #if defined(PLATFORM_ANDROID)
 #include <jni.h>
@@ -29,6 +36,11 @@ typedef struct AdsBridge {
     jmethodID consumeReward;
     jmethodID isPrivacyOptionsRequired;
     jmethodID showPrivacyOptions;
+    jmethodID isLeaderboardAvailable;
+    jmethodID getPlayerName;
+    jmethodID getSignInState;
+    jmethodID submitScore;
+    jmethodID showLeaderboard;
     bool ready;
 } AdsBridge;
 
@@ -57,10 +69,15 @@ void InitAds() {
     adsBridge.consumeReward = (*env)->GetMethodID(env, activityClass, "consumeReward", "()I");
     adsBridge.isPrivacyOptionsRequired = (*env)->GetMethodID(env, activityClass, "isPrivacyOptionsRequired", "()Z");
     adsBridge.showPrivacyOptions = (*env)->GetMethodID(env, activityClass, "showPrivacyOptions", "()V");
+    adsBridge.isLeaderboardAvailable = (*env)->GetMethodID(env, activityClass, "isLeaderboardAvailable", "()Z");
+    adsBridge.getPlayerName = (*env)->GetMethodID(env, activityClass, "getPlayerName", "()Ljava/lang/String;");
+    adsBridge.getSignInState = (*env)->GetMethodID(env, activityClass, "getSignInState", "()I");
+    adsBridge.submitScore = (*env)->GetMethodID(env, activityClass, "submitScore", "(J)V");
+    adsBridge.showLeaderboard = (*env)->GetMethodID(env, activityClass, "showLeaderboard", "()V");
     (*env)->DeleteLocalRef(env, activityClass);
 
     if (clearJavaException()) {
-        TraceLog(LOG_WARNING, "ADS: MainActivity is missing an ads method");
+        TraceLog(LOG_WARNING, "SERVICES: MainActivity is missing a method");
         return;
     }
     adsBridge.ready = true;
@@ -100,8 +117,41 @@ int ConsumeAdReward() {
     return clearJavaException() ? 0 : rewards;
 }
 
+bool LeaderboardAvailable() { return callJavaBool(adsBridge.isLeaderboardAvailable); }
+void ShowLeaderboard() { callJavaVoid(adsBridge.showLeaderboard); }
+
+int SignInState() {
+    if (!adsBridge.ready) return SIGN_IN_IDLE;
+    jint state = (*adsBridge.env)->CallIntMethod(adsBridge.env, adsBridge.activity, adsBridge.getSignInState);
+    return clearJavaException() ? SIGN_IN_IDLE : state;
+}
+
+void SubmitLeaderboardScore(int score) {
+    if (!adsBridge.ready) return;
+    (*adsBridge.env)->CallVoidMethod(adsBridge.env, adsBridge.activity, adsBridge.submitScore, (jlong)score);
+    clearJavaException();
+}
+
+// The Google Play Games name, or "" when not signed in. Asks Java about once a second.
+const char *PlayerName() {
+    if (!adsBridge.ready || playerNameCheck++ % 60 != 0) return playerName;
+    JNIEnv *env = adsBridge.env;
+    jstring name = (jstring)(*env)->CallObjectMethod(env, adsBridge.activity, adsBridge.getPlayerName);
+    if (clearJavaException() || name == NULL) return playerName;
+    const char *chars = (*env)->GetStringUTFChars(env, name, NULL);
+    snprintf(playerName, sizeof(playerName), "%s", chars);
+    (*env)->ReleaseStringUTFChars(env, name, chars);
+    (*env)->DeleteLocalRef(env, name);   // this thread never returns to Java, so free it ourselves
+    return playerName;
+}
+
 #else
 
+bool LeaderboardAvailable() { return false; }
+void ShowLeaderboard() {}
+int SignInState() { return SIGN_IN_IDLE; }
+void SubmitLeaderboardScore(int score) { (void)score; }
+const char *PlayerName() { return playerName; }
 void InitAds() {}
 void CloseAds() {}
 bool AdsSupported() { return false; }

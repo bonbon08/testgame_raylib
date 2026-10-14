@@ -57,3 +57,27 @@ Debug builds always use Google's test ads. For a release with real ads:
 3. Build with `./gradlew bundleRelease` and upload the `.aab` to the Google Play Console.
 
 Never tap your own real ads; AdMob bans accounts for that. Use the debug build for testing.
+
+### Leaderboard (Google Play Games)
+
+Scores are uploaded to a Google Play Games leaderboard, where players show up with their
+Play Games name. The LEADERBOARD button in the menu only appears once it is configured:
+
+1. In the Google Play Console, create the app, then under "Play Games Services > Setup and
+   management" create the Play Games project and add an Android credential with the
+   package name `io.github.bonbon08.jumperchicken` and the SHA-1 of your signing key
+   (debug and release key, plus the Play App Signing key once the app is on Play).
+2. Under "Leaderboards" create one leaderboard (score format: numeric, higher is better).
+3. Add yourself as a tester, then put both IDs into `android/gradle.properties`
+   (they are not secret):
+
+        jumperchicken.playGamesAppId=123456789012
+        jumperchicken.leaderboardId=CgkIxxxxxxxxxxxxEAIQAQ
+
+The highscore is submitted after every run; scores from before sign-in are uploaded later.
+
+## Difficulty
+
+Every wall touch makes the chicken a bit faster (up to a cap), and every 3 wall touches is a
+new level with one more spike (4 at the start, at most 7). The values are at the top of the
+difficulty section in `src/objects.c`.
