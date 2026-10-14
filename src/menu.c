@@ -37,11 +37,16 @@ Rectangle MenuOptionRect(int option, int screenWidth) {
     return (Rectangle){ screenWidth / 2 - 150, panel.y + 21 + option * 68, 300, 58 };
 }
 
+Rectangle MusicButtonRect() {
+    return (Rectangle){ 24, 24, 190, 50 };
+}
+
 Rectangle PrivacyButtonRect(int screenWidth, int screenHeight) {
     return (Rectangle){ screenWidth - 170, screenHeight - 64, 150, 44 };
 }
 
-void DrawMainMenu(int screenWidth, int screenHeight, int selected, Texture2D chickenTexture, int highscore, int coins, bool showPrivacy) {
+void DrawMainMenu(int screenWidth, int screenHeight, int selected, Texture2D chickenTexture, int highscore, int coins, bool showPrivacy,
+                  bool musicOn) {
     int centerX = screenWidth / 2;
     float time = (float)GetTime();
 
@@ -73,9 +78,11 @@ void DrawMainMenu(int screenWidth, int screenHeight, int selected, Texture2D chi
     drawTextCentered(TextFormat("Highscore: %d", highscore), centerX - 100, (int)(panel.y + panel.height) - 45, 24, WHITE);
     drawTextCentered(TextFormat("Coins: %d", coins), centerX + 110, (int)(panel.y + panel.height) - 45, 24, YELLOW);
 
-    const char *hint = IS_MOBILE ? "Tap to choose   -   tap to jump" : "UP / DOWN to choose   -   X to confirm";
+    const char *hint = IS_MOBILE ? "Tap to choose   -   tap to jump" : "UP / DOWN to choose   -   X to confirm   -   M for music";
     drawTextShadowCentered(hint, centerX, screenHeight - 50, 20, WHITE);
 
+    drawButton(MusicButtonRect(), musicOn ? "MUSIC: ON" : "MUSIC: OFF", 22, Fade(BLACK, musicOn ? 0.4f : 0.25f),
+               musicOn ? 1.0f : 0.6f);
     if (showPrivacy) drawButton(PrivacyButtonRect(screenWidth, screenHeight), "PRIVACY", 20, Fade(BLACK, 0.4f), 1.0f);
 }
 

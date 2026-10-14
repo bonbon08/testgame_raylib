@@ -12,8 +12,15 @@ Alternatively, `run.sh` cleans previous build files, rebuilds and starts the gam
 
 ## Controls
 
-- Desktop: X / Space / click to jump, arrow keys + X in menus, BACKSPACE to go back
+- Desktop: X / Space / click to jump, arrow keys + X in menus, BACKSPACE to go back, M toggles music
 - Android: tap to jump and to use the menus, the back button goes back
+
+## Music and sound
+
+The background music is chiptune synthesized at runtime in `src/audio.c` (no music files).
+Each track is a few lines of note data: chords, a melody, a bass and a drum pattern.
+Four tracks are included; "Sunny Hop" is free, the others can be bought in the shop.
+The jump sound is generated the same way. Music can be switched off in the main menu.
 
 ## Android
 
