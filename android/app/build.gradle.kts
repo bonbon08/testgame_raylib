@@ -8,6 +8,9 @@ val testAdmobRewardedId = "ca-app-pub-3940256099942544/5224354917"
 
 fun property(name: String): String? = providers.gradleProperty(name).orNull
 
+// -Pjumperchicken.adsEnabled=false builds an ad-free version (e.g. the APK sold on itch.io)
+val adsEnabled = property("jumperchicken.adsEnabled") != "false"
+
 // Copies the game's images and sounds into the APK assets (save files stay on the device)
 abstract class CopyGameAssets : DefaultTask() {
     @get:InputFiles
@@ -35,6 +38,7 @@ android {
     ndkVersion = "29.0.14206865"
 
     defaultConfig {
+        resValue("bool", "ads_enabled", adsEnabled.toString())
         // Google Play Games leaderboard; without these IDs the leaderboard button is hidden
         resValue("string", "play_games_app_id", property("jumperchicken.playGamesAppId") ?: "")
         resValue("string", "leaderboard_id", property("jumperchicken.leaderboardId") ?: "")
@@ -95,8 +99,8 @@ android {
 // A release for the Play Store must show real ads and be signed with the upload key.
 // Building one with test ads would earn nothing, so stop with a clear message instead.
 val releaseProblems = buildList {
-    if (property("jumperchicken.admobAppId") == null) add("jumperchicken.admobAppId")
-    if (property("jumperchicken.admobRewardedId") == null) add("jumperchicken.admobRewardedId")
+    if (adsEnabled && property("jumperchicken.admobAppId") == null) add("jumperchicken.admobAppId")
+    if (adsEnabled && property("jumperchicken.admobRewardedId") == null) add("jumperchicken.admobRewardedId")
     if (property("jumperchicken.keystore") == null) add("jumperchicken.keystore (and its passwords/alias)")
 }
 tasks.matching { it.name == "bundleRelease" || it.name == "assembleRelease" }.configureEach {

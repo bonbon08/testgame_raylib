@@ -58,7 +58,7 @@ public class MainActivity extends NativeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         hideSystemBars();
-        requestConsent();
+        if (areAdsEnabled()) requestConsent();
         if (JumperChickenApp.isPlayGamesConfigured(this)) checkGamesSignIn();
     }
 
@@ -130,6 +130,11 @@ public class MainActivity extends NativeActivity {
     }
 
     // ---- Called from native code (game thread) ----
+
+    /** False in the ad-free build (gradle property jumperchicken.adsEnabled=false). */
+    public boolean areAdsEnabled() {
+        return getResources().getBoolean(R.bool.ads_enabled);
+    }
 
     public boolean isRewardedAdReady() {
         return adReady;

@@ -26,6 +26,10 @@ void prepareSaveDirectory() {
 #if defined(PLATFORM_ANDROID)
     if (chdir(GetAndroidApp()->activity->internalDataPath) != 0) TraceLog(LOG_WARNING, "Could not open internal storage");
     mkdir("data", 0700);
+#else
+    // Started from a file manager or the itch.io app the working directory can be anywhere,
+    // but data/ always lies next to the executable
+    ChangeDirectory(GetApplicationDirectory());
 #endif
 }
 
@@ -306,6 +310,11 @@ int main(void)
     srand(time(NULL));
 
     prepareSaveDirectory();
+    if (!IS_MOBILE) {
+        Image icon = LoadImage("data/Chicken.png");
+        SetWindowIcon(icon);
+        UnloadImage(icon);
+    }
     LoadGame();
     InitAds();
     SubmitLeaderboardScore(Gamevars.highscore);   // uploads a highscore from before the leaderboard existed

@@ -31,6 +31,7 @@ typedef struct AdsBridge {
     JavaVM *vm;
     JNIEnv *env;
     jobject activity;
+    jmethodID areAdsEnabled;
     jmethodID isRewardedAdReady;
     jmethodID showRewardedAd;
     jmethodID consumeReward;
@@ -42,9 +43,12 @@ typedef struct AdsBridge {
     jmethodID submitScore;
     jmethodID showLeaderboard;
     bool ready;
+    bool adsEnabled;
 } AdsBridge;
 
 AdsBridge adsBridge = { 0 };
+
+bool callJavaBool(jmethodID method);
 
 bool clearJavaException() {
     if (!(*adsBridge.env)->ExceptionCheck(adsBridge.env)) return false;
@@ -64,6 +68,7 @@ void InitAds() {
     JNIEnv *env = adsBridge.env;
     adsBridge.activity = app->activity->clazz;   // the MainActivity instance
     jclass activityClass = (*env)->GetObjectClass(env, adsBridge.activity);
+    adsBridge.areAdsEnabled = (*env)->GetMethodID(env, activityClass, "areAdsEnabled", "()Z");
     adsBridge.isRewardedAdReady = (*env)->GetMethodID(env, activityClass, "isRewardedAdReady", "()Z");
     adsBridge.showRewardedAd = (*env)->GetMethodID(env, activityClass, "showRewardedAd", "()V");
     adsBridge.consumeReward = (*env)->GetMethodID(env, activityClass, "consumeReward", "()I");
@@ -81,6 +86,7 @@ void InitAds() {
         return;
     }
     adsBridge.ready = true;
+    adsBridge.adsEnabled = callJavaBool(adsBridge.areAdsEnabled);
 }
 
 void CloseAds() {
@@ -100,7 +106,7 @@ void callJavaVoid(jmethodID method) {
     clearJavaException();
 }
 
-bool AdsSupported() { return adsBridge.ready; }
+bool AdsSupported() { return adsBridge.ready && adsBridge.adsEnabled; }
 bool RewardedAdReady() { return callJavaBool(adsBridge.isRewardedAdReady); }
 bool PrivacyOptionsRequired() { return callJavaBool(adsBridge.isPrivacyOptionsRequired); }
 void ShowPrivacyOptions() { callJavaVoid(adsBridge.showPrivacyOptions); }

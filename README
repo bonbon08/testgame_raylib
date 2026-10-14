@@ -59,6 +59,12 @@ Debug builds always use Google's test ads. For a release with real ads:
 
 The full publishing checklist (in German), store graphics and listing texts are in `store/`.
 
+### itch.io
+
+`tools/build-desktop.sh` builds portable Windows and Linux zips into `dist/` (needs
+[Zig](https://ziglang.org) as cross compiler). `-Pjumperchicken.adsEnabled=false` builds an
+ad-free Android APK. Page texts, cover, trailer and price notes are in `store/itch/`.
+
 Never tap your own real ads; AdMob bans accounts for that. Use the debug build for testing.
 
 ### Leaderboard (Google Play Games)
