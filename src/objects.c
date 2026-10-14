@@ -41,16 +41,11 @@ typedef struct Gamelogik{
     int screenHeight;
 } Gamelogik ;
 
-typedef struct Menutextcolors {
-    Color text1;
-    Color text2;
-} Menutextcolors;
-
 typedef struct Menu {
     int auswahl;
     bool enabled;
     int untermenu;
-    Menutextcolors colours;
+    bool quit;
 } Menu ;
 
 
@@ -71,20 +66,9 @@ void Initgamevars() {
     Gamevars.screenHeight = 720;
 }
 
-void setcolors() {
-    if (Menuvars.auswahl == 0) {
-        Menuvars.colours.text1 = RED;
-        Menuvars.colours.text2 = WHITE;
-    } else if (Menuvars.auswahl == 1) {
-        Menuvars.colours.text1 = WHITE;
-        Menuvars.colours.text2 = RED;
-    }
-}
-
 void Initcolors() {
-    Menuvars.colours.text1 = RED;
-    Menuvars.colours.text2 = WHITE;
     Menuvars.enabled = true;
+    Menuvars.quit = false;
     Menuvars.auswahl = 0;
     Menuvars.untermenu = 0;
 }

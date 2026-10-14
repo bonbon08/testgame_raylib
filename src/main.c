@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <time.h>
 #include "objects.c"
+#include "background.c"
+#include "menu.c"
 
 
 int main(void)
@@ -17,9 +19,11 @@ int main(void)
     InitSpikes(Gamevars.screenWidth, Gamevars.screenHeight); 
     Initcolors();
     InitCoin();
+    InitBackground(Gamevars.screenWidth, Gamevars.screenHeight);
 
-    while (!WindowShouldClose())
+    while (!WindowShouldClose() && !Menuvars.quit)
     {
+        UpdateBackground(Gamevars.screenWidth, Gamevars.screenHeight);
         if (!Chicken.dead && Gamevars.startgame) {
             Gamevars.score += 1;
             if (IsKeyPressed(KEY_X)) Chicken.velocityY = Chicken.jumpForce;
@@ -69,7 +73,12 @@ int main(void)
                 PlaySound(maincoin.sound);
             }
         } else if (Menuvars.enabled) { 
-            if (IsKeyPressed(KEY_X) && Menuvars.untermenu == 0 && Menuvars.auswahl == 0) {
+            Gamevars.frameCounter++;
+            if (Gamevars.frameCounter % 20 == 0) Chicken.spr = 1 - Chicken.spr;
+
+            if (IsKeyPressed(KEY_X) && Menuvars.untermenu == 0 && Menuvars.auswahl == 1) {
+                Menuvars.quit = true;
+            } else if (IsKeyPressed(KEY_X) && Menuvars.untermenu == 0 && Menuvars.auswahl == 0) {
                 generateCoin(Gamevars.screenWidth, Gamevars.screenHeight);
                 Chicken.dead = false;
                 Menuvars.enabled = false;
@@ -108,9 +117,8 @@ int main(void)
                 generateSpikes(Gamevars.screenWidth, Gamevars.screenHeight, false);
             }
         }
-        setcolors();
         BeginDrawing();
-        ClearBackground(BLUE);
+        DrawBackground(Gamevars.screenWidth, Gamevars.screenHeight);
 
         for (int i = 0; i < NUM_SPIKES; i++) {
             
@@ -130,8 +138,8 @@ int main(void)
                         (int)Chicken.pos.x, (int)Chicken.pos.y, WHITE);
         } else if (Menuvars.enabled) {
             if (Menuvars.untermenu == 0) {
-                    DrawText("PRESS X TO START", Gamevars.screenWidth/4+60, (Gamevars.screenHeight/2)-30, 40, Menuvars.colours.text1);
-                    DrawText("EXIT", Gamevars.screenWidth/4+60, (Gamevars.screenHeight/2)+30, 40, Menuvars.colours.text2);
+                DrawMainMenu(Gamevars.screenWidth, Gamevars.screenHeight, Menuvars.auswahl,
+                             Chicken.textures[Chicken.spr], Gamevars.highscore, Gamevars.Coins);
             }
             
         } else {
@@ -139,8 +147,10 @@ int main(void)
             DrawText(TextFormat("Highscore: %d", Gamevars.highscore), Gamevars.screenWidth/4+140, (Gamevars.screenHeight/2)+20, 40, RED);
             DrawText(TextFormat("Score: %d", Gamevars.score), Gamevars.screenWidth/4+140, (Gamevars.screenHeight/2)+70, 40, RED);
         }
-        DrawText(TextFormat("Score: %d", Gamevars.score), 8, 8, 20, WHITE);
-        DrawText(TextFormat("Coins: %d", Gamevars.Coins), 8, 32, 20, YELLOW);
+        if (!Menuvars.enabled) {
+            DrawText(TextFormat("Score: %d", Gamevars.score), 8, 8, 20, WHITE);
+            DrawText(TextFormat("Coins: %d", Gamevars.Coins), 8, 32, 20, YELLOW);
+        }
         EndDrawing();
     }
 
