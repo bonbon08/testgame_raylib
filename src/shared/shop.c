@@ -1,5 +1,13 @@
 // Shop system: characters, backgrounds, music tracks
 #include "shop.h"
+#include "objects.h"
+#include "menu.h"
+#include "input.h"
+#include "services.h"
+#include "background.h"
+#include "audio.h"
+#include "effects.h"
+#include "filerw.h"
 
 #include <raylib.h>
 #include <math.h>
@@ -44,14 +52,9 @@ typedef struct Shop {
 
 static Shop Shopvars;
 
-#define NUM_THEMES 4
-extern Theme themes[NUM_THEMES];   // from background.c
-#define NUM_TRACKS 4
-extern MusicTrack tracks[NUM_TRACKS];   // from audio.c
-
 static Texture2D characterTextures[NUM_CHARACTERS][2];   // [character][0 = facing right, 1 = facing left]
 
-static void InitCharacters(void) {
+void InitCharacters(void) {
     for (int i = 0; i < NUM_CHARACTERS; i++) {
         Image image = LoadImage("data/Chicken.png");
         ImageColorReplace(&image, characters[0].body, characters[i].body);
@@ -65,7 +68,7 @@ static void InitCharacters(void) {
     }
 }
 
-static void UnloadCharacters(void) {
+void UnloadCharacters(void) {
     for (int i = 0; i < NUM_CHARACTERS; i++) {
         UnloadTexture(characterTextures[i][0]);
         UnloadTexture(characterTextures[i][1]);
@@ -74,6 +77,14 @@ static void UnloadCharacters(void) {
 
 Texture2D CurrentCharacterTexture(int direction) {
     return characterTextures[Shopvars.equipped[ROW_CHARACTERS]][direction == 0 ? 0 : 1];
+}
+
+Color CurrentCharacterBodyColor(void) {
+    return characters[Shopvars.equipped[ROW_CHARACTERS]].body;
+}
+
+Color CurrentCharacterShadeColor(void) {
+    return characters[Shopvars.equipped[ROW_CHARACTERS]].shade;
 }
 
 static bool owns(int mask, int item) {
@@ -107,8 +118,8 @@ void LoadGame(void) {
     SaveData save;
     LoadSave(&save);
 
-    Gamevars.highscore = save.highscore;
-    Gamevars.Coins = save.coins;
+    GetGamevars()->highscore = save.highscore;
+    GetGamevars()->Coins = save.coins;
     Shopvars.owned[ROW_CHARACTERS] = save.ownedCharacters;
     Shopvars.owned[ROW_BACKGROUNDS] = save.ownedBackgrounds;
     Shopvars.owned[ROW_MUSIC] = save.ownedMusic;
@@ -120,8 +131,8 @@ void LoadGame(void) {
 
 void SaveGame(void) {
     SaveData save = {
-        .highscore = Gamevars.highscore,
-        .coins = Gamevars.Coins,
+        .highscore = GetGamevars()->highscore,
+        .coins = GetGamevars()->Coins,
         .ownedCharacters = Shopvars.owned[ROW_CHARACTERS],
         .ownedBackgrounds = Shopvars.owned[ROW_BACKGROUNDS],
         .ownedMusic = Shopvars.owned[ROW_MUSIC],
@@ -130,7 +141,7 @@ void SaveGame(void) {
         .music = Shopvars.equipped[ROW_MUSIC],
         .musicOn = Shopvars.musicOn,
     };
-    if (!WriteSave(&save)) TraceLog(LOG_WARNING, "Could not write save file %s", SAVE_FILE);
+    if (!WriteSave(&save)) TraceLog(LOG_WARNING, "Could not write save file data/save.txt");
 }
 
 static Rectangle shopCardRect(int row, int col, int screenWidth) {
@@ -149,7 +160,7 @@ static void setShopMessage(const char *text, Color color) {
 }
 
 static bool browsingShopRow(int row) {
-    return Menuvars.enabled && Menuvars.untermenu == 1 && Shopvars.row == row;
+    return GetMenuvars()->enabled && GetMenuvars()->untermenu == 1 && Shopvars.row == row;
 }
 
 int PreviewedBackground(void) {
@@ -160,8 +171,21 @@ int PreviewedTrack(void) {
     return browsingShopRow(ROW_MUSIC) ? Shopvars.col : Shopvars.equipped[ROW_MUSIC];
 }
 
+int EquippedMusicTrack(void) {
+    return Shopvars.equipped[ROW_MUSIC];
+}
+
 bool MusicAudible(void) {
     return Shopvars.musicOn || browsingShopRow(ROW_MUSIC);
+}
+
+bool MusicOn(void) {
+    return Shopvars.musicOn;
+}
+
+void ToggleMusic(void) {
+    Shopvars.musicOn = !Shopvars.musicOn;
+    SaveGame();
 }
 
 static Rectangle ShopBackButtonRect(void) {
@@ -179,16 +203,16 @@ static void shopActivate(int row, int item, int screenWidth) {
     if (owns(Shopvars.owned[row], item)) {
         Shopvars.equipped[row] = item;
         setShopMessage(TextFormat("%s equipped", name), WHITE);
-    } else if (Gamevars.Coins >= price) {
-        Gamevars.Coins -= price;
+    } else if (GetGamevars()->Coins >= price) {
+        GetGamevars()->Coins -= price;
         Shopvars.owned[row] |= 1 << item;
         Shopvars.equipped[row] = item;
         setShopMessage(TextFormat("Bought %s!", name), (Color){ 120, 230, 120, 255 });
         Rectangle card = shopCardRect(row, item, screenWidth);
         SpawnParticles((Vector2){ card.x + card.width / 2, card.y + card.height / 2 }, 40, YELLOW, 7.0f, 7.0f);
-        PlaySound(maincoin.sound);
+        PlaySound(GetMaincoin()->sound);
     } else {
-        setShopMessage(TextFormat("Not enough coins - you need %d more", price - Gamevars.Coins),
+        setShopMessage(TextFormat("Not enough coins - you need %d more", price - GetGamevars()->Coins),
                        (Color){ 255, 110, 110, 255 });
         return;
     }
@@ -198,12 +222,12 @@ static void shopActivate(int row, int item, int screenWidth) {
 void UpdateShop(int screenWidth) {
     if (Shopvars.messageTimer > 0) Shopvars.messageTimer--;
 
-    if (IsBackPressed() || IsPointerPressedIn(ShopBackButtonRect())) {
-        Menuvars.untermenu = 0;
+    if (BackPressed() || PointerPressedIn(ShopBackButtonRect())) {
+        GetMenuvars()->untermenu = 0;
         return;
     }
 
-    if (AdsSupported() && IsPointerPressedIn(ShopAdButtonRect(screenWidth))) {
+    if (AdsSupported() && PointerPressedIn(ShopAdButtonRect(screenWidth))) {
         if (RewardedAdReady()) ShowRewardedAd(REWARD_COINS);
         else setShopMessage("No ad available right now - try again later", WHITE);
         return;
@@ -223,10 +247,10 @@ void UpdateShop(int screenWidth) {
         return;
     }
 
-    if (!IsMousePressed()) return;
+    if (!PointerPressed()) return;
     for (int row = 0; row < SHOP_ROWS; row++) {
         for (int col = 0; col < shopRowSize(row); col++) {
-            if (!IsPointerPressedIn(shopCardRect(row, col, screenWidth))) continue;
+            if (!PointerPressedIn(shopCardRect(row, col, screenWidth))) continue;
             if (Shopvars.row == row && Shopvars.col == col) {
                 shopActivate(row, col, screenWidth);
             } else {
@@ -289,11 +313,11 @@ static void drawShopCard(int row, int col, int screenWidth, int screenHeight) {
     } else if (owns(Shopvars.owned[row], col)) {
         drawTextCentered("OWNED", centerX, statusY, 20, Fade(WHITE, 0.8f));
     } else {
-        Color priceColor = Gamevars.Coins >= price ? YELLOW : (Color){ 255, 110, 110, 255 };
+        Color priceColor = GetGamevars()->Coins >= price ? YELLOW : (Color){ 255, 110, 110, 255 };
         const char *priceText = TextFormat("%d", price);
         int textWidth = MeasureText(priceText, 22);
         int startX = centerX - (textWidth + 26) / 2;
-        DrawTextureEx(maincoin.texture,
+        DrawTextureEx(GetMaincoin()->texture,
                       (Vector2){ (float)startX, (float)statusY - 2 },
                       0.0f, 0.34f, WHITE);
         DrawText(priceText, startX + 26, statusY, 22, priceColor);
@@ -317,11 +341,11 @@ void DrawShop(int screenWidth, int screenHeight) {
                    MENU_GREEN, RewardedAdReady() ? 1.0f : 0.5f);
     }
 
-    const char *coinsText = TextFormat("%d", Gamevars.Coins);
+    const char *coinsText = TextFormat("%d", GetGamevars()->Coins);
     int coinsWidth = MeasureText(coinsText, 32);
     DrawRectangleRounded((Rectangle){ screenWidth - coinsWidth - 100, 24, coinsWidth + 76, 52 },
                          1.0f, 10, Fade(BLACK, 0.3f));
-    DrawTextureEx(maincoin.texture,
+    DrawTextureEx(GetMaincoin()->texture,
                   (Vector2){ screenWidth - coinsWidth - 88, 30 },
                   0.0f, 0.62f, WHITE);
     DrawText(coinsText, screenWidth - coinsWidth - 42, 35, 32, YELLOW);
@@ -343,5 +367,3 @@ void DrawShop(int screenWidth, int screenHeight) {
                                  : "ARROWS to choose   -   X to buy / equip   -   BACKSPACE to go back";
     drawTextShadowCentered(hint, centerX, screenHeight - 34, 20, WHITE);
 }
-
-#endif /* SHOP_C */

@@ -21,12 +21,11 @@ int main(void)
     Initgamevars();
     InitWindow(1080, 720, "Jumper Chicken");
     InitVirtualScreen(&GetGamevars()->screenWidth, &GetGamevars()->screenHeight);
-    InitAudioDevice();
     SetTargetFPS(60);
     srand((unsigned int)time(NULL));
 
     PrepareSaveDirectory();
-    LoadSave(NULL);   // load via shop.LoadGame
+    LoadGame();
     InitAds();
     SubmitLeaderboardScore(GetGamevars()->highscore);
     Initplayer(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
@@ -35,14 +34,14 @@ int main(void)
     InitCoin();
     InitCharacters();
     InitBackground(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
-    InitGameAudio(GetShopEquippedMusic(), GetShopMusicOn());
+    InitGameAudio(EquippedMusicTrack(), MusicOn());
 
     while (!WindowShouldClose() && !GetMenuvars()->quit)
     {
         UpdateBackground(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
         UpdateEffects();
         ApplyAdRewards();
-        UpdateGameAudio(GetShopPreviewedTrack(), MusicAudible());
+        UpdateGameAudio(PreviewedTrack(), MusicAudible());
 
         if (!GetChicken()->dead && GetGamevars()->startgame)
             UpdateGameplay();

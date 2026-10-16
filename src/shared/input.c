@@ -4,12 +4,6 @@
 
 #include <raylib.h>
 
-#if defined(PLATFORM_ANDROID)
-#define IS_MOBILE true
-#else
-#define IS_MOBILE false
-#endif
-
 #define MIN_VIRTUAL_WIDTH 960
 
 // The game is drawn into a texture with a fixed height and then scaled to the real screen
@@ -33,25 +27,7 @@ static void updateVirtualScale(void) {
     };
 }
 
-static void BeginVirtualScreenInternal(void) {
-    updateVirtualScale();
-    BeginTextureMode(Screen.target);
-}
-
-static void EndVirtualScreenInternal(void) {
-    EndTextureMode();
-    BeginDrawing();
-    ClearBackground(BLACK);
-    Rectangle source = { 0, 0, (float)Screen.width, -(float)Screen.height };
-    Rectangle dest = {
-        Screen.offset.x, Screen.offset.y,
-        Screen.width * Screen.scale, Screen.height * Screen.scale
-    };
-    DrawTexturePro(Screen.target.texture, source, dest, (Vector2){ 0, 0 }, 0.0f, WHITE);
-    EndDrawing();
-}
-
-// InitVirtualScreen: called once at startup with final window dimensions
+// On phones the width grows with the display aspect ratio, so wide screens are filled without black bars
 void InitVirtualScreen(int *width, int *height) {
     if (IS_MOBILE) {
         float aspect = GetScreenWidth() / (float)GetScreenHeight();
@@ -65,17 +41,35 @@ void InitVirtualScreen(int *width, int *height) {
     updateVirtualScale();
 }
 
+void BeginVirtualScreen(void) {
+    updateVirtualScale();
+    BeginTextureMode(Screen.target);
+}
+
+void EndVirtualScreen(void) {
+    EndTextureMode();
+    BeginDrawing();
+    ClearBackground(BLACK);
+    Rectangle source = { 0, 0, (float)Screen.width, -(float)Screen.height };
+    Rectangle dest = {
+        Screen.offset.x, Screen.offset.y,
+        Screen.width * Screen.scale, Screen.height * Screen.scale
+    };
+    DrawTexturePro(Screen.target.texture, source, dest, (Vector2){ 0, 0 }, 0.0f, WHITE);
+    EndDrawing();
+}
+
 void CloseVirtualScreen(void) {
     UnloadRenderTexture(Screen.target);
 }
 
 // A click on desktop or a tap on the phone
-bool IsMousePressed(void) {
+bool PointerPressed(void) {
     return IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 }
 
 // Pointer position in virtual screen coordinates
-static Vector2 GetPointerPosition(void) {
+Vector2 PointerPosition(void) {
 #if defined(PLATFORM_ANDROID)
     Vector2 pos = GetTouchPosition(0);
 #else
@@ -87,14 +81,11 @@ static Vector2 GetPointerPosition(void) {
     };
 }
 
-bool IsPointerPressedIn(Rectangle area) {
-    return IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
-           CheckCollisionPointRec(GetPointerPosition(), area);
+bool PointerPressedIn(Rectangle area) {
+    return PointerPressed() && CheckCollisionPointRec(PointerPosition(), area);
 }
 
 // BACKSPACE on desktop, the back button on Android
-bool IsBackPressed(void) {
+bool BackPressed(void) {
     return IsKeyPressed(KEY_BACKSPACE) || IsKeyPressed(KEY_BACK);
 }
-
-#endif /* INPUT_C */

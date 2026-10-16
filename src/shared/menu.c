@@ -1,5 +1,6 @@
 // Main menu, death screen and UI drawing
 #include "menu.h"
+#include "input.h"
 
 #include <raylib.h>
 #include <math.h>
@@ -11,21 +12,21 @@
 
 static const char *menuOptions[MENU_OPTIONS] = { "START", "SHOP", "EXIT" };
 
-static const Color MENU_ORANGE = { 255, 140, 40, 255 };
-static const Color MENU_GOLD   = { 255, 214, 64, 255 };
-static const Color MENU_GREEN  = { 80, 190, 110, 255 };
+const Color MENU_ORANGE = { 255, 140, 40, 255 };
+const Color MENU_GOLD   = { 255, 214, 64, 255 };
+const Color MENU_GREEN  = { 80, 190, 110, 255 };
 
-static void drawTextCentered(const char *text, int centerX, int y, int fontSize, Color color) {
+void drawTextCentered(const char *text, int centerX, int y, int fontSize, Color color) {
     DrawText(text, centerX - MeasureText(text, fontSize) / 2, y, fontSize, color);
 }
 
-static void drawTextShadowCentered(const char *text, int centerX, int y, int fontSize, Color color) {
+void drawTextShadowCentered(const char *text, int centerX, int y, int fontSize, Color color) {
     drawTextCentered(text, centerX + 4, y + 4, fontSize,
                      Fade(BLACK, 0.35f * color.a / 255.0f));
     drawTextCentered(text, centerX, y, fontSize, color);
 }
 
-static void drawButton(Rectangle button, const char *text, int fontSize,
+void drawButton(Rectangle button, const char *text, int fontSize,
                        Color fill, float alpha) {
     DrawRectangleRounded(button, 1.0f, 12, Fade(fill, alpha));
     DrawRectangleRoundedLinesEx(button, 1.0f, 12, 3.0f, Fade(MENU_GOLD, alpha));
@@ -184,5 +185,3 @@ void DrawDeathScreen(int screenWidth, int screenHeight, int score, int highscore
         centerX, (int)(panel.y + panel.height) + 20, 20, Fade(WHITE, 0.85f * fade));
 #endif
 }
-
-#endif /* MENU_C */

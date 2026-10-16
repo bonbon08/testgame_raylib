@@ -1,42 +1,62 @@
-// Services layer (Ads, Leaderboard, I/O)
+// Android services: rewarded video ads (Google AdMob) and the leaderboard (Google Play Games).
+// On Android the calls go to MainActivity.java, on desktop all functions do nothing.
 #include "services.h"
 
 #include <raylib.h>
-#include <jni.h>
-#include <android/native_app_glue.h>
-#include <android/glue.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
 
-// Android-specific implementation
-#ifdef PLATFORM_ANDROID
+static RewardType pendingReward = REWARD_NONE;
+static char playerName[64] = "";
+static int playerNameCheck = 0;
 
-static struct android_app *GetAndroidApp(void) {
-    return NULL;  // will be initialized by Android framework
-}
+#define SIGN_IN_IDLE 0
+#define SIGN_IN_RUNNING 1
+#define SIGN_IN_FAILED 2
+
+#if defined(PLATFORM_ANDROID)
+#include <jni.h>
+#include <android_native_app_glue.h>
+
+struct android_app *GetAndroidApp(void);
+
+typedef struct AdsBridge {
+    JavaVM *vm;
+    JNIEnv *env;
+    jobject activity;
+    jmethodID isRewardedAdReady;
+    jmethodID showRewardedAd;
+    jmethodID consumeReward;
+    jmethodID isPrivacyOptionsRequired;
+    jmethodID showPrivacyOptions;
+    jmethodID isLeaderboardAvailable;
+    jmethodID getPlayerName;
+    jmethodID getSignInState;
+    jmethodID submitScore;
+    jmethodID showLeaderboard;
+    bool ready;
+} AdsBridge;
 
 static AdsBridge adsBridge = { 0 };
 
-static bool clearJavaException() {
-    if (!adsBridge.env) return false;
-    JNIEnv *env = adsBridge.env;
-    if ((*env)->ExceptionCheck(env)) {
-        (*env)->ExceptionDescribe(env);
-        (*env)->ExceptionClear(env);
-        return true;
-    }
-    return false;
+static bool clearJavaException(void) {
+    if (!(*adsBridge.env)->ExceptionCheck(adsBridge.env)) return false;
+    (*adsBridge.env)->ExceptionDescribe(adsBridge.env);
+    (*adsBridge.env)->ExceptionClear(adsBridge.env);
+    return true;
 }
 
-static void InitAds(void) {
+void InitAds(void) {
     struct android_app *app = GetAndroidApp();
     adsBridge.vm = app->activity->vm;
-    (*adsBridge.vm)->AttachCurrentThread(adsBridge.vm, &adsBridge.env, NULL);
+    if ((*adsBridge.vm)->AttachCurrentThread(adsBridge.vm, &adsBridge.env, NULL) != JNI_OK) {
+        TraceLog(LOG_WARNING, "ADS: Could not attach to the Java VM");
+        return;
+    }
+
     JNIEnv *env = adsBridge.env;
-    jclass activityClass = (*env)->GetObjectClass(env, app->activity->clazz);
+    adsBridge.activity = app->activity->clazz;   // the MainActivity instance
+    jclass activityClass = (*env)->GetObjectClass(env, adsBridge.activity);
     adsBridge.isRewardedAdReady = (*env)->GetMethodID(env, activityClass, "isRewardedAdReady", "()Z");
     adsBridge.showRewardedAd = (*env)->GetMethodID(env, activityClass, "showRewardedAd", "()V");
     adsBridge.consumeReward = (*env)->GetMethodID(env, activityClass, "consumeReward", "()I");
@@ -48,14 +68,15 @@ static void InitAds(void) {
     adsBridge.submitScore = (*env)->GetMethodID(env, activityClass, "submitScore", "(J)V");
     adsBridge.showLeaderboard = (*env)->GetMethodID(env, activityClass, "showLeaderboard", "()V");
     (*env)->DeleteLocalRef(env, activityClass);
+
     if (clearJavaException()) {
-        TraceLog(LOG_WARNING, "ADS: MainActivity is missing a method");
+        TraceLog(LOG_WARNING, "SERVICES: MainActivity is missing a method");
         return;
     }
     adsBridge.ready = true;
 }
 
-static void CloseAds(void) {
+void CloseAds(void) {
     if (adsBridge.vm != NULL) (*adsBridge.vm)->DetachCurrentThread(adsBridge.vm);
     adsBridge.ready = false;
 }
@@ -82,6 +103,7 @@ void ShowRewardedAd(RewardType reward) {
     callJavaVoid(adsBridge.showRewardedAd);
 }
 
+// Returns how many rewards were earned since the last call (normally 0 or 1)
 int ConsumeAdReward(void) {
     if (!adsBridge.ready) return 0;
     jint rewards = (*adsBridge.env)->CallIntMethod(adsBridge.env, adsBridge.activity, adsBridge.consumeReward);
@@ -92,9 +114,9 @@ bool LeaderboardAvailable(void) { return callJavaBool(adsBridge.isLeaderboardAva
 void ShowLeaderboard(void) { callJavaVoid(adsBridge.showLeaderboard); }
 
 int SignInState(void) {
-    if (!adsBridge.ready) return 0;
+    if (!adsBridge.ready) return SIGN_IN_IDLE;
     jint state = (*adsBridge.env)->CallIntMethod(adsBridge.env, adsBridge.activity, adsBridge.getSignInState);
-    return clearJavaException() ? 0 : state;
+    return clearJavaException() ? SIGN_IN_IDLE : state;
 }
 
 void SubmitLeaderboardScore(int score) {
@@ -103,6 +125,7 @@ void SubmitLeaderboardScore(int score) {
     clearJavaException();
 }
 
+// The Google Play Games name, or "" when not signed in. Asks Java about once a second.
 const char *PlayerName(void) {
     if (!adsBridge.ready || playerNameCheck++ % 60 != 0) return playerName;
     JNIEnv *env = adsBridge.env;
@@ -111,87 +134,24 @@ const char *PlayerName(void) {
     const char *chars = (*env)->GetStringUTFChars(env, name, NULL);
     snprintf(playerName, sizeof(playerName), "%s", chars);
     (*env)->ReleaseStringUTFChars(env, name, chars);
-    (*env)->DeleteLocalRef(env, name);
+    (*env)->DeleteLocalRef(env, name);   // this thread never returns to Java, so free it ourselves
     return playerName;
 }
 
-#else   // Non-Android (desktop) implementation
+#else
 
-static bool adsBridgeReady = false;
-static bool adsBridgeReady = false;
-
-static void InitAds(void) {
-    adsBridgeReady = true;
-}
-
-static void CloseAds(void) {
-    adsBridgeReady = false;
-}
-
-static bool callJavaBool(jmethodID method) { return false; }
-static void callJavaVoid(jmethodID method) { }
-
-bool AdsSupported(void) { return adsBridgeReady; }
+bool LeaderboardAvailable(void) { return false; }
+void ShowLeaderboard(void) {}
+int SignInState(void) { return SIGN_IN_IDLE; }
+void SubmitLeaderboardScore(int score) { (void)score; }
+const char *PlayerName(void) { return playerName; }
+void InitAds(void) {}
+void CloseAds(void) {}
+bool AdsSupported(void) { return false; }
 bool RewardedAdReady(void) { return false; }
 bool PrivacyOptionsRequired(void) { return false; }
-void ShowPrivacyOptions(void) { }
+void ShowPrivacyOptions(void) {}
 void ShowRewardedAd(RewardType reward) { (void)reward; }
 int ConsumeAdReward(void) { return 0; }
-bool LeaderboardAvailable(void) { return false; }
-void ShowLeaderboard(void) { }
-int SignInState(void) { return 0; }
-void SubmitLeaderboardScore(int score) { (void)score; }
-const char *PlayerName(void) { return ""; }
 
-#endif  // PLATFORM_ANDROID
-
-// RewardType enum and Reward handling
-typedef enum {
-    REWARD_NONE,
-    REWARD_COINS,
-    REWARD_REVIVE
-} RewardType;
-
-static RewardType pendingReward = REWARD_NONE;
-
-static void ShowRewardedAd(RewardType reward) {
-    pendingReward = reward;
-    ShowPrivacyOptions();
-}
-
-int ConsumeAdReward(void) {
-    if (!adsBridgeReady) return 0;
-    // Simulate reward consumption
-    return 1;  // return 1 reward for demo purposes
-}
-
-void InitializeAds(void) {
-#ifdef PLATFORM_ANDROID
-    InitAds();
-#else
-    adsBridgeReady = true;
 #endif
-}
-
-void CloseAds(void) {
-#ifdef PLATFORM_ANDROID
-    CloseAds();
-#else
-    adsBridgeReady = false;
-#endif
-}
-
-bool AdsSupported(void) { return adsBridgeReady; }
-bool RewardedAdReady(void) { return false; }  // handled by ShowRewardedAd()
-bool PrivacyOptionsRequired(void) { return false; }
-void ShowPrivacyOptions(void) { ShowPrivacyOptions(); }
-void ShowRewardedAd(RewardType reward) { ShowRewardedAd(reward); }
-int ConsumeAdReward(void) { return ConsumeAdReward(); }
-
-bool LeaderboardAvailable(void) { return false; }
-void ShowLeaderboard(void) { }
-int SignInState(void) { return 0; }
-void SubmitLeaderboardScore(int score) { }
-const char *PlayerName(void) { return ""; }
-
-#endif  // SERVICES_C

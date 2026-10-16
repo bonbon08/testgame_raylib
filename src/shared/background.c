@@ -9,6 +9,17 @@
 #define NUM_HILLS 6
 #define NUM_STARS 70
 
+Theme themes[NUM_THEMES] = {
+    { "Day",    0,   { 72, 152, 235, 255 }, { 186, 226, 255, 255 }, { 255, 228, 110, 255 },
+      { 244, 249, 255, 255 }, { 132, 196, 214, 255 }, { 104, 178, 150, 255 }, 120, false },
+    { "Sunset", 30,  { 64, 48, 120, 255 },  { 255, 160, 100, 255 }, { 255, 120, 60, 255 },
+      { 255, 196, 190, 255 }, { 170, 90, 120, 255 },  { 110, 60, 100, 255 },  470, false },
+    { "Night",  60,  { 8, 12, 36, 255 },    { 36, 54, 104, 255 },   { 236, 236, 214, 255 },
+      { 60, 72, 120, 255 },   { 32, 48, 92, 255 },    { 20, 32, 66, 255 },    110, true },
+    { "Candy",  120, { 255, 160, 215, 255 }, { 190, 235, 255, 255 }, { 255, 255, 255, 255 },
+      { 255, 255, 255, 255 }, { 170, 235, 210, 255 }, { 255, 190, 225, 255 }, 120, false },
+};
+
 static Cloud clouds[NUM_CLOUDS];
 static Hill farHills[NUM_HILLS];
 static Hill nearHills[NUM_HILLS];
@@ -106,5 +117,3 @@ void DrawThemePreview(Theme theme, Rectangle area, int screenHeight) {
     DrawCircleV((Vector2){ area.x + area.width * 0.55f, area.y + area.height + 40 }, 56, theme.nearHill);
     EndScissorMode();
 }
-
-#endif // BACKGROUND_C

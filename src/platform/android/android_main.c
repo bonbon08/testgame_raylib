@@ -34,7 +34,6 @@ static void RunGameLoop(struct android_app *app)
     GetGamevars()->screenWidth = screenWidth;
     GetGamevars()->screenHeight = screenHeight;
 
-    InitAudioDevice();
     SetTargetFPS(60);
     srand((unsigned int)time(NULL));
 
@@ -43,7 +42,7 @@ static void RunGameLoop(struct android_app *app)
         TraceLog(LOG_WARNING, "Could not open internal storage");
     mkdir("data", 0700);
 
-    LoadSave(NULL);
+    LoadGame();
     InitAds();
     SubmitLeaderboardScore(GetGamevars()->highscore);
     Initplayer(screenWidth, screenHeight);
@@ -52,14 +51,14 @@ static void RunGameLoop(struct android_app *app)
     InitCoin();
     InitCharacters();
     InitBackground(screenWidth, screenHeight);
-    InitGameAudio(GetShopEquippedMusic(), GetShopMusicOn());
+    InitGameAudio(EquippedMusicTrack(), MusicOn());
 
     while (!WindowShouldClose() && !GetMenuvars()->quit)
     {
         UpdateBackground(screenWidth, screenHeight);
         UpdateEffects();
         ApplyAdRewards();
-        UpdateGameAudio(GetShopPreviewedTrack(), MusicAudible());
+        UpdateGameAudio(PreviewedTrack(), MusicAudible());
 
         if (!GetChicken()->dead && GetGamevars()->startgame)
             UpdateGameplay();

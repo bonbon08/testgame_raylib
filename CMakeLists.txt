@@ -24,4 +24,5 @@ else()
 endif()
 
 add_executable(spiel ${SHARED_SRC} ${PLATFORM_SRC})
+target_include_directories(spiel PRIVATE include include/shared)
 target_link_libraries(spiel PRIVATE raylib)

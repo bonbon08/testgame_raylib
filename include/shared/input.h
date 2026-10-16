@@ -5,6 +5,15 @@
 #include <raylib.h>
 #include <stdbool.h>
 
+#if defined(PLATFORM_ANDROID)
+#define IS_MOBILE true
+#else
+#define IS_MOBILE false
+#endif
+
+// A click on desktop or a tap on the phone
+bool PointerPressed(void);
+
 // Pointer position in virtual screen coordinates
 Vector2 PointerPosition(void);
 

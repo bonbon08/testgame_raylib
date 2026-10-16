@@ -118,5 +118,3 @@ void DrawEffects(void) {
                  Fade(popups[i].color, alpha));
     }
 }
-
-#endif /* EFFECTS_C */

@@ -11,18 +11,6 @@
 #define LEGACY_HIGHSCORE_FILE "data/hscore.txt"
 #define LEGACY_COINS_FILE "data/coins.txt"
 
-typedef struct SaveData {
-    int highscore;
-    int coins;
-    int ownedCharacters;   // bitmask: bit i set = character i bought
-    int ownedBackgrounds;  // bitmask: bit i set = background i bought
-    int ownedMusic;        // bitmask: bit i set = music track i bought
-    int character;
-    int background;
-    int music;
-    int musicOn;
-} SaveData;
-
 static void defaultSave(SaveData *save) {
     save->highscore = 0;
     save->coins = 0;
@@ -113,5 +101,3 @@ bool WriteSave(const SaveData *save) {
     }
     return true;
 }
-
-#endif /* FILERW_C */

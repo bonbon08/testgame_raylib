@@ -74,8 +74,8 @@ void KillChicken(void) {
         GetChicken()->pos.x + CHICKEN_SIZE / 2.0f,
         GetChicken()->pos.y + CHICKEN_SIZE / 2.0f
     };
-    SpawnParticles(center, 24, CurrentCharacterTexture(GetChicken()->direction).body, 6.0f, 7.0f);
-    SpawnParticles(center, 8, CurrentCharacterTexture(GetChicken()->direction).shade, 5.0f, 6.0f);
+    SpawnParticles(center, 24, CurrentCharacterBodyColor(), 6.0f, 7.0f);
+    SpawnParticles(center, 8, CurrentCharacterShadeColor(), 5.0f, 6.0f);
 }
 
 // Continue the run after watching an ad: back to the middle, keep the score
@@ -137,7 +137,7 @@ void UpdateGameplay(void) {
                 GetChicken()->pos.y + CHICKEN_SIZE - 8
             },
             4,
-            Fade(CurrentCharacterTexture(GetChicken()->direction).body, 0.8f),
+            Fade(CurrentCharacterBodyColor(), 0.8f),
             2.5f, 6.0f);
     }
 
@@ -230,8 +230,7 @@ void UpdateMenu(void) {
     if (BackPressed())
         GetMenuvars()->quit = true;   // Android back button leaves the game
     if (IsKeyPressed(KEY_M) || PointerPressedIn(MusicButtonRect())) {
-        Shopvars.musicOn = !Shopvars.musicOn;
-        SaveGame();
+        ToggleMusic();
         return;
     }
     if (IsKeyPressed(KEY_X))
@@ -326,7 +325,7 @@ void DrawFrame(void) {
                 CurrentCharacterTexture(0),
                 GetGamevars()->highscore, GetGamevars()->Coins,
                 PrivacyOptionsRequired(),
-                Shopvars.musicOn,
+                MusicOn(),
                 LeaderboardAvailable(),
                 PlayerName(),
                 SignInState());
@@ -353,5 +352,3 @@ void DrawFrame(void) {
     }
     EndVirtualScreen();
 }
-
-#endif /* GAME_C */

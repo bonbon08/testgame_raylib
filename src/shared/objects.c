@@ -10,51 +10,6 @@
 #define SLOT_HEIGHT 64
 #define CHICKEN_SIZE 64
 
-typedef struct Spike {
-    Vector2 pos;
-    bool active;
-    Texture2D spiketexture;
-} Spike;
-
-typedef struct Coin {
-    Vector2 pos;
-    Texture2D texture;
-    Sound sound;
-} Coin;
-
-typedef struct Player {
-    Vector2 pos;
-    int direction;
-    float velocityY;
-    float gravity;
-    float jumpForce;
-    float rotation;
-    float squash;      // > 0 stretches the chicken (jump), < 0 flattens it (landing)
-    int deathTimer;
-    int invulnerable;  // frames left without spike collisions (after a revive)
-    bool dead;
-} Player;
-
-typedef struct Gamelogik {
-    int score;
-    int highscore;
-    int Coins;
-    bool newHighscore;
-    int bounces;       // wall touches in this run, drives the difficulty
-    bool usedRevive;   // a run can only be continued once
-    bool startgame;
-    int frameCounter;
-    int screenWidth;
-    int screenHeight;
-} Gamelogik;
-
-typedef struct Menu {
-    int auswahl;
-    bool enabled;
-    int untermenu;     // 0 = main menu, 1 = shop
-    bool quit;
-} Menu;
-
 // Global state (shared with main loop)
 static Spike lspikes[MAX_SPIKES];
 static Spike rspikes[MAX_SPIKES];
@@ -197,7 +152,7 @@ void Initgamevars(void) {
     Gamevars.screenHeight = 720;
 }
 
-void Initcolors(void) {
+void InitColors(void) {
     Menuvars.enabled = true;
     Menuvars.quit = false;
     Menuvars.auswahl = 0;
@@ -218,5 +173,3 @@ void DrawChicken(Texture2D texture, Color tint) {
                    (Vector2){ dest.width / 2, dest.height / 2 },
                    Chicken.rotation, tint);
 }
-
-#endif /* OBJECTS_C */

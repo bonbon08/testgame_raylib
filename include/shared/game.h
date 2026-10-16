@@ -4,9 +4,6 @@
 
 #include <raylib.h>
 
-// Game state accessors (defined in game.c / objects.c / shop.c)
-extern int Shopvars_musicOn;   // placeholder; real accessor via shop.h
-
 // Called once per frame from platform main
 void UpdateGameplay(void);
 void UpdateMenu(void);
@@ -16,10 +13,8 @@ void StartGame(void);
 void BackToMenu(void);
 void ApplyAdRewards(void);
 
-// Called once at startup
-void InitGame(void);
-
-// Called once at shutdown
-void ShutdownGame(void);
+// Called once at startup (Android: raylib writes into internal storage, so the
+// save directory needs preparing there before anything reads or writes a save file)
+void PrepareSaveDirectory(void);
 
 #endif // GAME_H
