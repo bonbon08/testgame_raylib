@@ -13,5 +13,15 @@ FetchContent_Declare(
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(raylib)
 
-add_executable(spiel src/main.c)
+# Sammle alle Quelldateien im shared/-Verzeichnis
+file(GLOB SHARED_SRC "src/shared/*.c")
+
+# Plattform-spezifischer Einstiegspunkt
+if(PLATFORM_ANDROID)
+    set(PLATFORM_SRC "src/platform/android/android_main.c")
+else()
+    set(PLATFORM_SRC "src/platform/desktop/main.c")
+endif()
+
+add_executable(spiel ${SHARED_SRC} ${PLATFORM_SRC})
 target_link_libraries(spiel PRIVATE raylib)

@@ -1,0 +1,23 @@
+// Input abstraction layer
+#ifndef INPUT_H
+#define INPUT_H
+
+#include <raylib.h>
+#include <stdbool.h>
+
+// Pointer position in virtual screen coordinates
+Vector2 PointerPosition(void);
+
+// Pointer pressed in rectangle
+bool PointerPressedIn(Rectangle area);
+
+// Back button pressed (BACKSPACE on desktop, back button on Android)
+bool BackPressed(void);
+
+// Virtual screen management
+void InitVirtualScreen(int *width, int *height);
+void BeginVirtualScreen(void);
+void EndVirtualScreen(void);
+void CloseVirtualScreen(void);
+
+#endif // INPUT_H
