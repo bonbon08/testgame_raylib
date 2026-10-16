@@ -18,6 +18,7 @@ static int playerNameCheck = 0;
 #include <jni.h>
 #include <android_native_app_glue.h>
 
+// Provided by raylib (rcore_android.c); not declared in raylib.h
 struct android_app *GetAndroidApp(void);
 
 typedef struct AdsBridge {

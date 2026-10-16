@@ -24,6 +24,10 @@
 #if defined(PLATFORM_ANDROID)
 #include <unistd.h>
 #include <sys/stat.h>
+#include <android_native_app_glue.h>
+
+// Provided by raylib (rcore_android.c); not declared in raylib.h
+struct android_app *GetAndroidApp(void);
 #endif
 
 void PrepareSaveDirectory(void) {

@@ -1,11 +1,10 @@
-// Android entry point (NativeActivity) for Jumper Chicken
+// Android entry point for Jumper Chicken.
+// raylib's own android_main() (in rcore_android.c) sets up the NativeActivity
+// glue and then calls this regular main(), exactly like the desktop build.
 #include <raylib.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <time.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <android/native_app_glue.h>
 
 #include "shared/game.h"
 #include "shared/objects.h"
@@ -18,44 +17,32 @@
 #include "shared/shop.h"
 #include "shared/filerw.h"
 
-// Forward declaration from Android framework
-extern void *GetAndroidApp(void);
-
-// Called once per frame from platform main
-static void RunGameLoop(struct android_app *app)
+int main(int argc, char *argv[])
 {
-    int screenWidth = 1080, screenHeight = 720;
+    (void)argc;
+    (void)argv;
 
-    GetGamevars()->screenWidth = screenWidth;
-    GetGamevars()->screenHeight = screenHeight;
-
+    Initgamevars();
     InitWindow(0, 0, "Jumper Chicken");   // full screen on phones
-    InitVirtualScreen(&screenWidth, &screenHeight);
-    GetGamevars()->screenWidth = screenWidth;
-    GetGamevars()->screenHeight = screenHeight;
-
+    InitVirtualScreen(&GetGamevars()->screenWidth, &GetGamevars()->screenHeight);
     SetTargetFPS(60);
     srand((unsigned int)time(NULL));
 
-    // Prepare internal storage path on Android
-    if (chdir(GetAndroidApp()->activity->internalDataPath) != 0)
-        TraceLog(LOG_WARNING, "Could not open internal storage");
-    mkdir("data", 0700);
-
+    PrepareSaveDirectory();
     LoadGame();
     InitAds();
     SubmitLeaderboardScore(GetGamevars()->highscore);
-    Initplayer(screenWidth, screenHeight);
-    InitSpikes(screenWidth, screenHeight);
+    Initplayer(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
+    InitSpikes(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
     InitColors();
     InitCoin();
     InitCharacters();
-    InitBackground(screenWidth, screenHeight);
+    InitBackground(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
     InitGameAudio(EquippedMusicTrack(), MusicOn());
 
     while (!WindowShouldClose() && !GetMenuvars()->quit)
     {
-        UpdateBackground(screenWidth, screenHeight);
+        UpdateBackground(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
         UpdateEffects();
         ApplyAdRewards();
         UpdateGameAudio(PreviewedTrack(), MusicAudible());
@@ -82,12 +69,6 @@ static void RunGameLoop(struct android_app *app)
     CloseVirtualScreen();
     CloseAudioDevice();
     CloseWindow();
-}
 
-// NativeActivity entry point
-void android_main(struct android_app *app)
-{
-    app->onAppCmd = NULL;
-    app->onInputEvent = NULL;
-    RunGameLoop(app);
+    return 0;
 }
