@@ -17,10 +17,13 @@ static void defaultSave(SaveData *save) {
     save->ownedCharacters = 1;
     save->ownedBackgrounds = 1;
     save->ownedMusic = 1;
+    save->ownedAbilities = 0;
     save->character = 0;
     save->background = 0;
     save->music = 0;
     save->musicOn = 1;
+    save->hasHut = 0;
+    save->hutLastCollect = 0;
 }
 
 static void sanitizeSave(SaveData *save) {
@@ -30,6 +33,8 @@ static void sanitizeSave(SaveData *save) {
     save->ownedBackgrounds |= 1;
     save->ownedMusic |= 1;
     save->musicOn = save->musicOn != 0;
+    save->hasHut = save->hasHut != 0;
+    if (save->hutLastCollect < 0) save->hutLastCollect = 0;
 }
 
 static bool readLegacyInt(const char *filename, int *value) {
@@ -56,19 +61,22 @@ bool LoadSave(SaveData *save) {
 
     char line[128];
     char key[32];
-    int value;
+    long value;
     while (fgets(line, sizeof(line), fp) != NULL) {
-        if (sscanf(line, "%31[^=]=%d", key, &value) != 2) continue;
+        if (sscanf(line, "%31[^=]=%ld", key, &value) != 2) continue;
 
-        if (strcmp(key, "highscore") == 0) save->highscore = value;
-        else if (strcmp(key, "coins") == 0) save->coins = value;
-        else if (strcmp(key, "owned_characters") == 0) save->ownedCharacters = value;
-        else if (strcmp(key, "owned_backgrounds") == 0) save->ownedBackgrounds = value;
-        else if (strcmp(key, "character") == 0) save->character = value;
-        else if (strcmp(key, "background") == 0) save->background = value;
-        else if (strcmp(key, "owned_music") == 0) save->ownedMusic = value;
-        else if (strcmp(key, "music") == 0) save->music = value;
-        else if (strcmp(key, "music_on") == 0) save->musicOn = value;
+        if (strcmp(key, "highscore") == 0) save->highscore = (int)value;
+        else if (strcmp(key, "coins") == 0) save->coins = (int)value;
+        else if (strcmp(key, "owned_characters") == 0) save->ownedCharacters = (int)value;
+        else if (strcmp(key, "owned_backgrounds") == 0) save->ownedBackgrounds = (int)value;
+        else if (strcmp(key, "character") == 0) save->character = (int)value;
+        else if (strcmp(key, "background") == 0) save->background = (int)value;
+        else if (strcmp(key, "owned_music") == 0) save->ownedMusic = (int)value;
+        else if (strcmp(key, "music") == 0) save->music = (int)value;
+        else if (strcmp(key, "music_on") == 0) save->musicOn = (int)value;
+        else if (strcmp(key, "owned_abilities") == 0) save->ownedAbilities = (int)value;
+        else if (strcmp(key, "has_hut") == 0) save->hasHut = (int)value;
+        else if (strcmp(key, "hut_last_collect") == 0) save->hutLastCollect = value;
     }
     fclose(fp);
 
@@ -83,10 +91,12 @@ bool WriteSave(const SaveData *save) {
 
     bool ok = fprintf(fp,
         "highscore=%d\ncoins=%d\nowned_characters=%d\nowned_backgrounds=%d\nowned_music=%d\n"
-        "character=%d\nbackground=%d\nmusic=%d\nmusic_on=%d\n",
+        "character=%d\nbackground=%d\nmusic=%d\nmusic_on=%d\n"
+        "owned_abilities=%d\nhas_hut=%d\nhut_last_collect=%ld\n",
         save->highscore, save->coins,
         save->ownedCharacters, save->ownedBackgrounds, save->ownedMusic,
-        save->character, save->background, save->music, save->musicOn) > 0;
+        save->character, save->background, save->music, save->musicOn,
+        save->ownedAbilities, save->hasHut, save->hutLastCollect) > 0;
     if (fclose(fp) != 0) ok = false;
 
     if (!ok) {

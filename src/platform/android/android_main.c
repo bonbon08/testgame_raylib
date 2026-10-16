@@ -15,6 +15,7 @@
 #include "shared/effects.h"
 #include "shared/menu.h"
 #include "shared/shop.h"
+#include "shared/coop.h"
 #include "shared/filerw.h"
 
 int main(int argc, char *argv[])
@@ -31,6 +32,7 @@ int main(int argc, char *argv[])
     PrepareSaveDirectory();
     LoadGame();
     InitAds();
+    InitCoop();
     SubmitLeaderboardScore(GetGamevars()->highscore);
     Initplayer(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
     InitSpikes(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
@@ -39,6 +41,11 @@ int main(int argc, char *argv[])
     InitCharacters();
     InitBackground(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
     InitGameAudio(EquippedMusicTrack(), MusicOn());
+
+    if (LastHutEarnings() > 0) {
+        SpawnPopup((Vector2){ GetGamevars()->screenWidth / 2.0f, GetGamevars()->screenHeight / 2.0f - 80 },
+                   TextFormat("+%d coins", LastHutEarnings()), YELLOW);
+    }
 
     while (!WindowShouldClose() && !GetMenuvars()->quit)
     {
@@ -59,6 +66,7 @@ int main(int argc, char *argv[])
 
     SaveGame();
 
+    CloseCoop();
     CloseAds();
     CloseGameAudio();
     UnloadCharacters();

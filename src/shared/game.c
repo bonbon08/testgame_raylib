@@ -13,6 +13,8 @@
 #include "effects.h"
 #include "menu.h"
 #include "shop.h"
+#include "abilities.h"
+#include "coop.h"
 #include "filerw.h"
 
 #define DEATH_ANIMATION_FRAMES 70
@@ -56,6 +58,7 @@ void StartGame(void) {
     GetChicken()->squash = 0;
     GetChicken()->invulnerable = 0;
     GetGamevars()->startgame = true;
+    ResetAbilities();
     generateSpikes(GetGamevars()->screenWidth, GetGamevars()->screenHeight, false);
 }
 
@@ -123,6 +126,9 @@ void ApplyAdRewards(void) {
 
 void UpdateGameplay(void) {
     GetGamevars()->score += 1;
+    GetGamevars()->frameCounter++;
+    UpdateAbilities();
+    UpdateCoop();
     if (BackPressed()) {
         // Leaving a run keeps the collected coins and the highscore
         UpdateHighscore();
@@ -133,6 +139,7 @@ void UpdateGameplay(void) {
     }
     if (IsKeyPressed(KEY_X) || IsKeyPressed(KEY_SPACE) || PointerPressed()) {
         GetChicken()->velocityY = GetChicken()->jumpForce;
+        ApplyJumpAbility();   // Double Jump may chain a quick second tap into a stronger boost
         GetChicken()->squash = 1.0f;
         PlayJumpSound();
         SpawnParticles(
@@ -159,10 +166,11 @@ void UpdateGameplay(void) {
         GetChicken()->velocityY = 0;
     }
 
+    float speed = ChickenSpeed() + DashSpeedBonus();
     if (GetChicken()->direction == 0)
-        GetChicken()->pos.x += ChickenSpeed();
+        GetChicken()->pos.x += speed;
     if (GetChicken()->direction == 2)
-        GetChicken()->pos.x -= ChickenSpeed();
+        GetChicken()->pos.x -= speed;
 
     bool hitRightWall = GetChicken()->pos.x >= GetGamevars()->screenWidth - CHICKEN_SIZE;
     if (hitRightWall || GetChicken()->pos.x <= 0) {
@@ -207,6 +215,12 @@ void UpdateGameplay(void) {
         }
     }
 
+    Vector2 chickenCenter = {
+        GetChicken()->pos.x + CHICKEN_SIZE / 2.0f,
+        GetChicken()->pos.y + CHICKEN_SIZE / 2.0f
+    };
+    GetMaincoin()->pos = ApplyCoinMagnet(GetMaincoin()->pos, chickenCenter);
+
     Rectangle coinRect = { GetMaincoin()->pos.x + 12, GetMaincoin()->pos.y + 4, 40, 56 };
     if (CheckCollisionRecs(chickenRect, coinRect)) {
         Vector2 coinCenter = { GetMaincoin()->pos.x + 32, GetMaincoin()->pos.y + 32 };
@@ -228,6 +242,10 @@ static void SelectMenuOption(int option) {
 void UpdateMenu(void) {
     if (GetMenuvars()->untermenu == 1) {
         UpdateShop(GetGamevars()->screenWidth);
+        return;
+    }
+    if (GetMenuvars()->untermenu == 2) {
+        UpdateCoopMenu(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
         return;
     }
 
@@ -252,6 +270,9 @@ void UpdateMenu(void) {
     } else if (LeaderboardAvailable() &&
                PointerPressedIn(LeaderboardButtonRect(GetGamevars()->screenWidth))) {
         ShowLeaderboard();
+    } else if (CoopSupported() &&
+               PointerPressedIn(CoopButtonRect(GetGamevars()->screenWidth, GetGamevars()->screenHeight))) {
+        GetMenuvars()->untermenu = 2;
     } else {
         for (int i = 0; i < MENU_OPTIONS; i++) {
             if (!PointerPressedIn(MenuOptionRect(i, GetGamevars()->screenWidth)))
@@ -287,6 +308,20 @@ void UpdateDeath(void) {
     }
 }
 
+// A translucent chicken at the co-op peer's last known position; each device still
+// runs its own level, this is just a visual "they're right there" overlay
+static void DrawGhostChicken(void) {
+    Texture2D texture = CurrentCharacterTexture(PeerDirection());
+    Vector2 pos = PeerPosition();
+    Rectangle source = { 0, 0, (float)texture.width, (float)texture.height };
+    Rectangle dest = {
+        pos.x + CHICKEN_SIZE / 2.0f, pos.y + CHICKEN_SIZE / 2.0f,
+        (float)CHICKEN_SIZE, (float)CHICKEN_SIZE
+    };
+    DrawTexturePro(texture, source, dest,
+                   (Vector2){ dest.width / 2, dest.height / 2 }, 0.0f, Fade(WHITE, 0.55f));
+}
+
 void DrawFrame(void) {
     Camera2D camera = { 0 };
     camera.offset = UpdateShake();
@@ -318,6 +353,7 @@ void DrawFrame(void) {
                 ? Fade(WHITE, 0.35f)
                 : WHITE;
         DrawChicken(CurrentCharacterTexture(GetChicken()->direction), tint);
+        if (CoopConnected()) DrawGhostChicken();
     }
     EndMode2D();
 
@@ -332,14 +368,20 @@ void DrawFrame(void) {
                 MusicOn(),
                 LeaderboardAvailable(),
                 PlayerName(),
-                SignInState());
-        } else {
+                SignInState(),
+                CoopSupported());
+        } else if (GetMenuvars()->untermenu == 1) {
             DrawShop(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
+        } else {
+            DrawCoopMenu(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
         }
     } else {
         DrawText(TextFormat("Score: %d", GetGamevars()->score), 8, 8, 20, WHITE);
         DrawText(TextFormat("Coins: %d", GetGamevars()->Coins), 8, 32, 20, YELLOW);
         DrawText(TextFormat("Level: %d", GameLevel()), 8, 56, 20, MENU_GOLD);
+        if (CoopConnected())
+            DrawText(TextFormat("Peer score: %d", PeerScore()), 8, 80, 20, Fade(WHITE, 0.8f));
+        DrawAbilityButtons(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
     }
 
     DrawEffects();

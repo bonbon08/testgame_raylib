@@ -54,12 +54,34 @@ public class MainActivity extends NativeActivity {
     private volatile String playerName = "";
     private long bestPendingScore = 0;      // only touched on the main thread
 
+    private CoopManager coop;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         hideSystemBars();
         requestConsent();
         if (JumperChickenApp.isPlayGamesConfigured(this)) checkGamesSignIn();
+        coop = new CoopManager(this);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == CoopManager.RC_DISCOVERABLE) coop.onDiscoverableResult();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        // No extra handling needed: native code polls coopPermissionsGranted() each frame.
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (coop != null) coop.disconnect();
+        super.onDestroy();
     }
 
     @Override
@@ -245,5 +267,55 @@ public class MainActivity extends NativeActivity {
             if (formError != null) Log.w(TAG, "Privacy options: " + formError.getMessage());
             hideSystemBars();
         }));
+    }
+
+    // ---- Local co-op over Bluetooth (src/shared/coop.c) ----
+
+    public boolean coopHasBluetooth() {
+        return coop.hasBluetooth();
+    }
+
+    public boolean coopHasPermissions() {
+        return coop.hasPermissions();
+    }
+
+    public void coopRequestPermissions() {
+        coop.requestPermissions();
+    }
+
+    public void coopStartHost() {
+        coop.startHost();
+    }
+
+    public void coopStartJoin() {
+        coop.startJoin();
+    }
+
+    public boolean coopIsConnected() {
+        return coop.isConnected();
+    }
+
+    public void coopSend(float x, float y, int direction, int score) {
+        coop.send(x, y, direction, score);
+    }
+
+    public float coopGetPeerX() {
+        return coop.getPeerX();
+    }
+
+    public float coopGetPeerY() {
+        return coop.getPeerY();
+    }
+
+    public int coopGetPeerDirection() {
+        return coop.getPeerDirection();
+    }
+
+    public int coopGetPeerScore() {
+        return coop.getPeerScore();
+    }
+
+    public void coopDisconnect() {
+        coop.disconnect();
     }
 }

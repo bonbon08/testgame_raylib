@@ -1,4 +1,4 @@
-// Shop system: characters, backgrounds, music tracks
+// Shop system: characters, backgrounds, music tracks, abilities, chicken coop
 #include "shop.h"
 #include "objects.h"
 #include "menu.h"
@@ -6,12 +6,14 @@
 #include "services.h"
 #include "background.h"
 #include "audio.h"
+#include "abilities.h"
 #include "effects.h"
 #include "filerw.h"
 
 #include <raylib.h>
 #include <math.h>
 #include <stdio.h>
+#include <time.h>
 
 #define NUM_CHARACTERS 5
 #define SHOP_MESSAGE_FRAMES 120
@@ -32,19 +34,45 @@ static CharacterItem characters[NUM_CHARACTERS] = {
     { "Shadow",   150, { 95, 95, 120, 255 },   { 65, 65, 90, 255 },    { 40, 40, 58, 255 } },
 };
 
-#define SHOP_ROWS 3
-#define ROW_CHARACTERS 0
-#define ROW_BACKGROUNDS 1
-#define ROW_MUSIC 2
+typedef struct ShopItem {
+    const char *name;
+    int price;
+} ShopItem;
 
-static const char *shopRowTitles[SHOP_ROWS] = { "CHARACTERS", "BACKGROUNDS", "MUSIC" };
+// ABILITY_DOUBLE_JUMP, ABILITY_SHIELD, ABILITY_MAGNET, ABILITY_DASH (abilities.h)
+static ShopItem abilityItems[NUM_ABILITIES] = {
+    { "Double Jump", 60 },
+    { "Shield",      90 },
+    { "Coin Magnet", 50 },
+    { "Dash",        100 },
+};
+
+#define NUM_HUT_ITEMS 1
+static ShopItem hutItems[NUM_HUT_ITEMS] = {
+    { "Chicken Coop", 200 },
+};
+
+// A coin every HUT_SECONDS_PER_COIN seconds of real time, capped at HUT_MAX_OFFLINE_SECONDS
+#define HUT_SECONDS_PER_COIN 120
+#define HUT_MAX_OFFLINE_SECONDS (24 * 60 * 60)
+
+static const char *shopRowTitles[SHOP_ROWS] = {
+    "CHARACTERS", "BACKGROUNDS", "MUSIC", "ABILITIES", "CHICKEN COOP"
+};
+
+#define SHOP_PAGE_ITEMS 0
+#define SHOP_PAGE_ABILITIES 1
+#define SHOP_PAGES 2
 
 typedef struct Shop {
-    int row;                  // ROW_CHARACTERS, ROW_BACKGROUNDS or ROW_MUSIC
+    int page;
+    int row;                  // slot within the current page (0-based)
     int col;
     int owned[SHOP_ROWS];     // bitmask per row: bit i set = item i bought
-    int equipped[SHOP_ROWS];  // equipped item per row
+    int equipped[SHOP_ROWS];  // equipped item per row (only meaningful for rowHasEquip() rows)
     bool musicOn;
+    long hutLastCollect;      // unix timestamp of the last idle-coin payout
+    int lastHutEarnings;      // coins credited the last time LoadGame() ran, for a popup
     char message[64];
     Color messageColor;
     int messageTimer;
@@ -91,22 +119,62 @@ static bool owns(int mask, int item) {
     return (mask >> item) & 1;
 }
 
+bool OwnsAbility(int ability) {
+    return owns(Shopvars.owned[ROW_ABILITIES], ability);
+}
+
+bool OwnsHut(void) {
+    return owns(Shopvars.owned[ROW_HUT], 0);
+}
+
+int LastHutEarnings(void) {
+    return Shopvars.lastHutEarnings;
+}
+
+// Characters, backgrounds and music can be equipped (one active item per row);
+// abilities and the coop are one-off purchases with no "equipped" state.
+static bool rowHasEquip(int row) {
+    return row == ROW_CHARACTERS || row == ROW_BACKGROUNDS || row == ROW_MUSIC;
+}
+
+// Vertical slot a row is drawn at on its shop page (both pages start back at the top)
+static int rowSlot(int row) {
+    if (row == ROW_ABILITIES) return 0;
+    if (row == ROW_HUT) return 1;
+    return row;   // ROW_CHARACTERS/BACKGROUNDS/MUSIC are already 0, 1, 2
+}
+
+static int rowsOnPage(int page) {
+    return page == SHOP_PAGE_ITEMS ? 3 : 2;
+}
+
+static int pageRow(int page, int slot) {
+    if (page == SHOP_PAGE_ITEMS) return slot;             // 0,1,2 -> CHARACTERS,BACKGROUNDS,MUSIC
+    return slot == 0 ? ROW_ABILITIES : ROW_HUT;
+}
+
 static int shopRowSize(int row) {
     if (row == ROW_CHARACTERS) return NUM_CHARACTERS;
     if (row == ROW_BACKGROUNDS) return NUM_THEMES;
-    return NUM_TRACKS;
+    if (row == ROW_MUSIC) return NUM_TRACKS;
+    if (row == ROW_ABILITIES) return NUM_ABILITIES;
+    return NUM_HUT_ITEMS;
 }
 
 static const char *shopItemName(int row, int item) {
     if (row == ROW_CHARACTERS) return characters[item].name;
     if (row == ROW_BACKGROUNDS) return themes[item].name;
-    return tracks[item].name;
+    if (row == ROW_MUSIC) return tracks[item].name;
+    if (row == ROW_ABILITIES) return abilityItems[item].name;
+    return hutItems[item].name;
 }
 
 static int shopItemPrice(int row, int item) {
     if (row == ROW_CHARACTERS) return characters[item].price;
     if (row == ROW_BACKGROUNDS) return themes[item].price;
-    return tracks[item].price;
+    if (row == ROW_MUSIC) return tracks[item].price;
+    if (row == ROW_ABILITIES) return abilityItems[item].price;
+    return hutItems[item].price;
 }
 
 static int validEquipped(int row, int item) {
@@ -123,10 +191,28 @@ void LoadGame(void) {
     Shopvars.owned[ROW_CHARACTERS] = save.ownedCharacters;
     Shopvars.owned[ROW_BACKGROUNDS] = save.ownedBackgrounds;
     Shopvars.owned[ROW_MUSIC] = save.ownedMusic;
+    Shopvars.owned[ROW_ABILITIES] = save.ownedAbilities;
+    Shopvars.owned[ROW_HUT] = save.hasHut ? 1 : 0;
     Shopvars.equipped[ROW_CHARACTERS] = validEquipped(ROW_CHARACTERS, save.character);
     Shopvars.equipped[ROW_BACKGROUNDS] = validEquipped(ROW_BACKGROUNDS, save.background);
     Shopvars.equipped[ROW_MUSIC] = validEquipped(ROW_MUSIC, save.music);
     Shopvars.musicOn = save.musicOn;
+    Shopvars.hutLastCollect = save.hutLastCollect;
+
+    Shopvars.lastHutEarnings = 0;
+    if (OwnsHut()) {
+        long now = (long)time(NULL);
+        long elapsed = now - Shopvars.hutLastCollect;
+        if (elapsed < 0) elapsed = 0;
+        if (elapsed > HUT_MAX_OFFLINE_SECONDS) elapsed = HUT_MAX_OFFLINE_SECONDS;
+        int earned = (int)(elapsed / HUT_SECONDS_PER_COIN);
+        if (earned > 0) {
+            GetGamevars()->Coins += earned;
+            Shopvars.lastHutEarnings = earned;
+        }
+        Shopvars.hutLastCollect = now;
+        SaveGame();
+    }
 }
 
 void SaveGame(void) {
@@ -136,20 +222,23 @@ void SaveGame(void) {
         .ownedCharacters = Shopvars.owned[ROW_CHARACTERS],
         .ownedBackgrounds = Shopvars.owned[ROW_BACKGROUNDS],
         .ownedMusic = Shopvars.owned[ROW_MUSIC],
+        .ownedAbilities = Shopvars.owned[ROW_ABILITIES],
         .character = Shopvars.equipped[ROW_CHARACTERS],
         .background = Shopvars.equipped[ROW_BACKGROUNDS],
         .music = Shopvars.equipped[ROW_MUSIC],
         .musicOn = Shopvars.musicOn,
+        .hasHut = OwnsHut() ? 1 : 0,
+        .hutLastCollect = Shopvars.hutLastCollect,
     };
     if (!WriteSave(&save)) TraceLog(LOG_WARNING, "Could not write save file data/save.txt");
 }
 
 static Rectangle shopCardRect(int row, int col, int screenWidth) {
-    float cardWidth = 170, cardHeight = 150, gap = 22;
+    float cardWidth = 170, cardHeight = 132, gap = 22;
     int size = shopRowSize(row);
     float totalWidth = size * cardWidth + (size - 1) * gap;
     float x = (screenWidth - totalWidth) / 2 + col * (cardWidth + gap);
-    float y = 118 + row * 178;
+    float y = 150 + rowSlot(row) * 156;
     return (Rectangle){ x, y, cardWidth, cardHeight };
 }
 
@@ -160,7 +249,8 @@ static void setShopMessage(const char *text, Color color) {
 }
 
 static bool browsingShopRow(int row) {
-    return GetMenuvars()->enabled && GetMenuvars()->untermenu == 1 && Shopvars.row == row;
+    return GetMenuvars()->enabled && GetMenuvars()->untermenu == 1 &&
+           pageRow(Shopvars.page, Shopvars.row) == row;
 }
 
 int PreviewedBackground(void) {
@@ -196,17 +286,28 @@ static Rectangle ShopAdButtonRect(int screenWidth) {
     return (Rectangle){ screenWidth - 420, 24, 230, 52 };
 }
 
+static Rectangle ShopPageTabRect(int page, int screenWidth) {
+    float width = 160, gap = 10;
+    float startX = screenWidth / 2 - (SHOP_PAGES * width + (SHOP_PAGES - 1) * gap) / 2;
+    return (Rectangle){ startX + page * (width + gap), 78, width, 40 };
+}
+
 static void shopActivate(int row, int item, int screenWidth) {
     const char *name = shopItemName(row, item);
     int price = shopItemPrice(row, item);
+    bool alreadyOwned = owns(Shopvars.owned[row], item);
 
-    if (owns(Shopvars.owned[row], item)) {
+    if (alreadyOwned && rowHasEquip(row)) {
         Shopvars.equipped[row] = item;
         setShopMessage(TextFormat("%s equipped", name), WHITE);
+    } else if (alreadyOwned) {
+        setShopMessage(TextFormat("%s already owned", name), WHITE);
+        return;
     } else if (GetGamevars()->Coins >= price) {
         GetGamevars()->Coins -= price;
         Shopvars.owned[row] |= 1 << item;
-        Shopvars.equipped[row] = item;
+        if (rowHasEquip(row)) Shopvars.equipped[row] = item;
+        if (row == ROW_HUT) Shopvars.hutLastCollect = (long)time(NULL);
         setShopMessage(TextFormat("Bought %s!", name), (Color){ 120, 230, 120, 255 });
         Rectangle card = shopCardRect(row, item, screenWidth);
         SpawnParticles((Vector2){ card.x + card.width / 2, card.y + card.height / 2 }, 40, YELLOW, 7.0f, 7.0f);
@@ -233,28 +334,47 @@ void UpdateShop(int screenWidth) {
         return;
     }
 
-    int size = shopRowSize(Shopvars.row);
+    if (IsKeyPressed(KEY_TAB)) {
+        Shopvars.page = (Shopvars.page + 1) % SHOP_PAGES;
+        Shopvars.row = 0;
+        Shopvars.col = 0;
+    }
+    for (int page = 0; page < SHOP_PAGES; page++) {
+        if (PointerPressedIn(ShopPageTabRect(page, screenWidth)) && page != Shopvars.page) {
+            Shopvars.page = page;
+            Shopvars.row = 0;
+            Shopvars.col = 0;
+            return;
+        }
+    }
+
+    int row = pageRow(Shopvars.page, Shopvars.row);
+    int size = shopRowSize(row);
     if (IsKeyPressed(KEY_LEFT)) Shopvars.col = (Shopvars.col - 1 + size) % size;
     if (IsKeyPressed(KEY_RIGHT)) Shopvars.col = (Shopvars.col + 1) % size;
     if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_DOWN)) {
-        int direction = IsKeyPressed(KEY_UP) ? SHOP_ROWS - 1 : 1;
-        Shopvars.row = (Shopvars.row + direction) % SHOP_ROWS;
-        if (Shopvars.col >= shopRowSize(Shopvars.row)) Shopvars.col = shopRowSize(Shopvars.row) - 1;
+        int rows = rowsOnPage(Shopvars.page);
+        int direction = IsKeyPressed(KEY_UP) ? rows - 1 : 1;
+        Shopvars.row = (Shopvars.row + direction) % rows;
+        int newRow = pageRow(Shopvars.page, Shopvars.row);
+        if (Shopvars.col >= shopRowSize(newRow)) Shopvars.col = shopRowSize(newRow) - 1;
     }
 
     if (IsKeyPressed(KEY_X)) {
-        shopActivate(Shopvars.row, Shopvars.col, screenWidth);
+        shopActivate(pageRow(Shopvars.page, Shopvars.row), Shopvars.col, screenWidth);
         return;
     }
 
     if (!PointerPressed()) return;
-    for (int row = 0; row < SHOP_ROWS; row++) {
-        for (int col = 0; col < shopRowSize(row); col++) {
-            if (!PointerPressedIn(shopCardRect(row, col, screenWidth))) continue;
-            if (Shopvars.row == row && Shopvars.col == col) {
-                shopActivate(row, col, screenWidth);
+    int rows = rowsOnPage(Shopvars.page);
+    for (int slot = 0; slot < rows; slot++) {
+        int absRow = pageRow(Shopvars.page, slot);
+        for (int col = 0; col < shopRowSize(absRow); col++) {
+            if (!PointerPressedIn(shopCardRect(absRow, col, screenWidth))) continue;
+            if (Shopvars.row == slot && Shopvars.col == col) {
+                shopActivate(absRow, col, screenWidth);
             } else {
-                Shopvars.row = row;
+                Shopvars.row = slot;
                 Shopvars.col = col;
             }
             return;
@@ -277,8 +397,34 @@ static void drawMusicIcon(Rectangle area, Color accent, bool playing) {
     }
 }
 
+// Simple glyphs for the ability cards (no spare art budget for new sprites)
+static void drawAbilityIcon(int ability, Rectangle area) {
+    Vector2 center = { area.x + area.width / 2, area.y + area.height / 2 };
+    switch (ability) {
+        case ABILITY_DOUBLE_JUMP:
+            DrawCircleV((Vector2){ center.x, center.y + 10 }, 12, Fade(WHITE, 0.5f));
+            DrawCircleV((Vector2){ center.x, center.y - 8 }, 12, WHITE);
+            break;
+        case ABILITY_SHIELD:
+            DrawPoly(center, 6, 22, 0, (Color){ 90, 170, 255, 255 });
+            DrawPolyLinesEx(center, 6, 22, 0, 3.0f, WHITE);
+            break;
+        case ABILITY_MAGNET:
+            DrawRing(center, 10, 20, 200, 340, 16, (Color){ 230, 90, 90, 255 });
+            DrawRing(center, 10, 20, 20, 160, 16, (Color){ 230, 230, 230, 255 });
+            break;
+        default:   // ABILITY_DASH
+            for (int i = 0; i < 3; i++) {
+                DrawTriangle((Vector2){ center.x - 18 + i * 12, center.y - 14 },
+                            (Vector2){ center.x - 18 + i * 12, center.y + 14 },
+                            (Vector2){ center.x - 6 + i * 12, center.y }, (Color){ 255, 160, 60, 255 });
+            }
+            break;
+    }
+}
+
 static void drawShopCard(int row, int col, int screenWidth, int screenHeight) {
-    bool selected = Shopvars.row == row && Shopvars.col == col;
+    bool selected = pageRow(Shopvars.page, Shopvars.row) == row && Shopvars.col == col;
     int price = shopItemPrice(row, col);
     float time = (float)GetTime();
 
@@ -298,16 +444,32 @@ static void drawShopCard(int row, int col, int screenWidth, int screenHeight) {
         Rectangle preview = { card.x + 14, card.y + 12, card.width - 28, 74 };
         DrawThemePreview(themes[col], preview, screenHeight);
         DrawRectangleLinesEx(preview, 2.0f, Fade(WHITE, 0.6f));
-    } else {
+    } else if (row == ROW_MUSIC) {
         bool playing = PreviewedTrack() == col && MusicAudible();
         drawMusicIcon((Rectangle){ card.x + 14, card.y + 16, card.width - 28, 66 }, tracks[col].accent, playing);
+    } else if (row == ROW_ABILITIES) {
+        drawAbilityIcon(col, (Rectangle){ card.x, card.y + 10, card.width, 76 });
+    } else {   // ROW_HUT
+        Rectangle hutArea = { card.x + card.width / 2 - 34, card.y + 12, 68, 64 };
+        DrawTriangle((Vector2){ hutArea.x + hutArea.width / 2, hutArea.y },
+                    (Vector2){ hutArea.x - 6, hutArea.y + 30 },
+                    (Vector2){ hutArea.x + hutArea.width + 6, hutArea.y + 30 }, (Color){ 180, 110, 70, 255 });
+        DrawRectangle((int)hutArea.x, (int)hutArea.y + 28, (int)hutArea.width, (int)(hutArea.height - 28),
+                     (Color){ 220, 170, 120, 255 });
+        DrawRectangle((int)(hutArea.x + hutArea.width / 2 - 8), (int)(hutArea.y + hutArea.height - 24), 16, 20,
+                     (Color){ 120, 80, 50, 255 });
+        if (OwnsHut()) {
+            drawTextCentered("+1 coin / 2 min", (int)(card.x + card.width / 2), (int)card.y + 94, 14,
+                             Fade(YELLOW, 0.9f));
+        }
     }
 
     int centerX = (int)(card.x + card.width / 2);
-    drawTextCentered(shopItemName(row, col), centerX, (int)card.y + 94, 20, WHITE);
+    if (row != ROW_HUT || !OwnsHut())
+        drawTextCentered(shopItemName(row, col), centerX, (int)card.y + 94, 20, WHITE);
 
     int statusY = (int)card.y + 120;
-    if (Shopvars.equipped[row] == col) {
+    if (rowHasEquip(row) && Shopvars.equipped[row] == col) {
         drawTextCentered("EQUIPPED", centerX, statusY, 20,
                          (Color){ 120, 230, 120, 255 });
     } else if (owns(Shopvars.owned[row], col)) {
@@ -331,6 +493,14 @@ static void drawShopCard(int row, int col, int screenWidth, int screenHeight) {
     }
 }
 
+static void drawShopPageTab(int page, int screenWidth) {
+    Rectangle rect = ShopPageTabRect(page, screenWidth);
+    bool active = Shopvars.page == page;
+    const char *label = page == SHOP_PAGE_ITEMS ? "ITEMS" : "ABILITIES";
+    DrawRectangleRounded(rect, 0.4f, 8, Fade(active ? MENU_ORANGE : BLACK, active ? 0.9f : 0.35f));
+    drawTextCentered(label, (int)(rect.x + rect.width / 2), (int)(rect.y + 10), 18, WHITE);
+}
+
 void DrawShop(int screenWidth, int screenHeight) {
     int centerX = screenWidth / 2;
 
@@ -350,7 +520,11 @@ void DrawShop(int screenWidth, int screenHeight) {
                   0.0f, 0.62f, WHITE);
     DrawText(coinsText, screenWidth - coinsWidth - 42, 35, 32, YELLOW);
 
-    for (int row = 0; row < SHOP_ROWS; row++) {
+    for (int page = 0; page < SHOP_PAGES; page++) drawShopPageTab(page, screenWidth);
+
+    int rows = rowsOnPage(Shopvars.page);
+    for (int slot = 0; slot < rows; slot++) {
+        int row = pageRow(Shopvars.page, slot);
         drawTextShadowCentered(shopRowTitles[row], centerX,
                                (int)shopCardRect(row, 0, screenWidth).y - 28, 22, WHITE);
         for (int col = 0; col < shopRowSize(row); col++)
@@ -359,11 +533,11 @@ void DrawShop(int screenWidth, int screenHeight) {
 
     if (Shopvars.messageTimer > 0) {
         float alpha = Shopvars.messageTimer > 20 ? 1.0f : Shopvars.messageTimer / 20.0f;
-        drawTextShadowCentered(Shopvars.message, centerX, 640, 24,
+        drawTextShadowCentered(Shopvars.message, centerX, 608, 24,
                                Fade(Shopvars.messageColor, alpha));
     }
 
-    const char *hint = IS_MOBILE ? "Tap a card to choose   -   tap it again to buy / equip"
-                                 : "ARROWS to choose   -   X to buy / equip   -   BACKSPACE to go back";
+    const char *hint = IS_MOBILE ? "Tap a card to choose   -   tap it again to buy / equip   -   tap ITEMS/ABILITIES to switch page"
+                                 : "ARROWS to choose   -   X to buy / equip   -   TAB to switch page   -   BACKSPACE to go back";
     drawTextShadowCentered(hint, centerX, screenHeight - 34, 20, WHITE);
 }

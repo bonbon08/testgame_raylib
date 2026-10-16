@@ -24,12 +24,14 @@ Rectangle MenuOptionRect(int option, int screenWidth);
 Rectangle MusicButtonRect(void);
 Rectangle LeaderboardButtonRect(int screenWidth);
 Rectangle PrivacyButtonRect(int screenWidth, int screenHeight);
+Rectangle CoopButtonRect(int screenWidth, int screenHeight);
 Rectangle DeathButtonRect(int button, int screenWidth, int screenHeight, bool canRevive);
 
 // Drawing functions
 void DrawMainMenu(int screenWidth, int screenHeight, int selected, Texture2D chickenTexture,
                   int highscore, int coins, bool showPrivacy, bool musicOn,
-                  bool showLeaderboard, const char *playerName, int signInState);
+                  bool showLeaderboard, const char *playerName, int signInState,
+                  bool showCoop);
 void DrawDeathScreen(int screenWidth, int screenHeight, int score, int highscore,
                      bool newHighscore, bool canRevive, bool reviveReady, float fade);
 

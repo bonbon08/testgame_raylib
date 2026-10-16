@@ -13,6 +13,7 @@
 #include "shared/effects.h"
 #include "shared/menu.h"
 #include "shared/shop.h"
+#include "shared/coop.h"
 #include "shared/filerw.h"
 
 #if !defined(PLATFORM_ANDROID)
@@ -27,6 +28,7 @@ int main(void)
     PrepareSaveDirectory();
     LoadGame();
     InitAds();
+    InitCoop();
     SubmitLeaderboardScore(GetGamevars()->highscore);
     Initplayer(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
     InitSpikes(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
@@ -35,6 +37,11 @@ int main(void)
     InitCharacters();
     InitBackground(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
     InitGameAudio(EquippedMusicTrack(), MusicOn());
+
+    if (LastHutEarnings() > 0) {
+        SpawnPopup((Vector2){ GetGamevars()->screenWidth / 2.0f, GetGamevars()->screenHeight / 2.0f - 80 },
+                   TextFormat("+%d coins", LastHutEarnings()), YELLOW);
+    }
 
     while (!WindowShouldClose() && !GetMenuvars()->quit)
     {
@@ -55,6 +62,7 @@ int main(void)
 
     SaveGame();
 
+    CloseCoop();
     CloseAds();
     CloseGameAudio();
     UnloadCharacters();

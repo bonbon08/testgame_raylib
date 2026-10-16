@@ -58,9 +58,15 @@ Rectangle PrivacyButtonRect(int screenWidth, int screenHeight) {
     return (Rectangle){ screenWidth - 170, screenHeight - 64, 150, 44 };
 }
 
+Rectangle CoopButtonRect(int screenWidth, int screenHeight) {
+    (void)screenWidth;
+    return (Rectangle){ 24, screenHeight - 64, 180, 44 };
+}
+
 void DrawMainMenu(int screenWidth, int screenHeight, int selected, Texture2D chickenTexture,
                   int highscore, int coins, bool showPrivacy, bool musicOn,
-                  bool showLeaderboard, const char *playerName, int signInState) {
+                  bool showLeaderboard, const char *playerName, int signInState,
+                  bool showCoop) {
     int centerX = screenWidth / 2;
     float time = (float)GetTime();
 
@@ -122,6 +128,10 @@ void DrawMainMenu(int screenWidth, int screenHeight, int selected, Texture2D chi
     if (showPrivacy)
         drawButton(PrivacyButtonRect(screenWidth, screenHeight), "PRIVACY", 20,
                    Fade(BLACK, 0.4f), 1.0f);
+
+    if (showCoop)
+        drawButton(CoopButtonRect(screenWidth, screenHeight), "CO-OP", 20,
+                   (Color){ 90, 170, 255, 255 }, 1.0f);
 }
 
 static Rectangle deathPanelRect(int screenWidth, int screenHeight,

@@ -10,10 +10,13 @@ typedef struct SaveData {
     int ownedCharacters;
     int ownedBackgrounds;
     int ownedMusic;
+    int ownedAbilities;
     int character;
     int background;
     int music;
     int musicOn;
+    int hasHut;
+    long hutLastCollect;   // unix timestamp of the last idle-coin payout, 0 = never
 } SaveData;
 
 bool LoadSave(SaveData *save);
