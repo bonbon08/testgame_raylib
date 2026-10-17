@@ -25,6 +25,7 @@ static void defaultSave(SaveData *save) {
     save->hutLastCollect = 0;
     save->ownedHats = 1;
     save->hat = 0;
+    save->unlockedAbilities = 0;
 }
 
 static void sanitizeSave(SaveData *save) {
@@ -80,6 +81,7 @@ bool LoadSave(SaveData *save) {
         else if (strcmp(key, "hut_last_collect") == 0) save->hutLastCollect = value;
         else if (strcmp(key, "owned_hats") == 0) save->ownedHats = (int)value;
         else if (strcmp(key, "hat") == 0) save->hat = (int)value;
+        else if (strcmp(key, "unlocked_abilities") == 0) save->unlockedAbilities = (int)value;
     }
     fclose(fp);
 
@@ -95,11 +97,11 @@ bool WriteSave(const SaveData *save) {
     bool ok = fprintf(fp,
         "highscore=%d\ncoins=%d\nowned_characters=%d\nowned_backgrounds=%d\nowned_music=%d\n"
         "character=%d\nbackground=%d\nmusic=%d\nmusic_on=%d\n"
-        "has_hut=%d\nhut_last_collect=%ld\nowned_hats=%d\nhat=%d\n",
+        "has_hut=%d\nhut_last_collect=%ld\nowned_hats=%d\nhat=%d\nunlocked_abilities=%d\n",
         save->highscore, save->coins,
         save->ownedCharacters, save->ownedBackgrounds, save->ownedMusic,
         save->character, save->background, save->music, save->musicOn,
-        save->hasHut, save->hutLastCollect, save->ownedHats, save->hat) > 0;
+        save->hasHut, save->hutLastCollect, save->ownedHats, save->hat, save->unlockedAbilities) > 0;
     if (fclose(fp) != 0) ok = false;
 
     if (!ok) {

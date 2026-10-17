@@ -390,7 +390,6 @@ void DrawFrame(void) {
         DrawText(TextFormat("Level: %d", GameLevel()), 8, 56, 20, MENU_GOLD);
         if (CoopConnected())
             DrawText(TextFormat("Peer score: %d", PeerScore()), 8, 80, 20, Fade(WHITE, 0.8f));
-        DrawAbilityButtons(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
     }
 
     DrawEffects();
