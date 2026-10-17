@@ -139,7 +139,6 @@ void UpdateGameplay(void) {
     }
     if (IsKeyPressed(KEY_X) || IsKeyPressed(KEY_SPACE) || PointerPressed()) {
         GetChicken()->velocityY = GetChicken()->jumpForce;
-        ApplyJumpAbility();   // Double Jump may chain a quick second tap into a stronger boost
         GetChicken()->squash = 1.0f;
         PlayJumpSound();
         SpawnParticles(
@@ -346,13 +345,23 @@ void DrawFrame(void) {
                               180.0f, 1.0f, WHITE);
             }
         }
-        if (!GetChicken()->dead) DrawCoin();
+        if (!GetChicken()->dead) {
+            DrawCoin();
+            DrawAbilityPickup();
+        }
         // Blink while invulnerable after a revive
         Color tint =
             (GetChicken()->invulnerable / 6) % 2 == 1
                 ? Fade(WHITE, 0.35f)
                 : WHITE;
         DrawChicken(CurrentCharacterTexture(GetChicken()->direction), tint);
+        if (!GetChicken()->dead) {
+            Vector2 chickenCenter = {
+                GetChicken()->pos.x + CHICKEN_SIZE / 2.0f,
+                GetChicken()->pos.y + CHICKEN_SIZE / 2.0f
+            };
+            DrawEquippedHat(chickenCenter, GetChicken()->rotation);
+        }
         if (CoopConnected()) DrawGhostChicken();
     }
     EndMode2D();

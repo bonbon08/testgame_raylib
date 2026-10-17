@@ -1,26 +1,25 @@
-// Purchasable gameplay abilities (double jump, shield, coin magnet, dash)
+// Gameplay abilities (shield, coin magnet, dash): collected as in-level pickups,
+// then active for the rest of the run (lost again on death)
 #ifndef ABILITIES_H
 #define ABILITIES_H
 
 #include <raylib.h>
 #include <stdbool.h>
 
-#define ABILITY_DOUBLE_JUMP 0
-#define ABILITY_SHIELD      1
-#define ABILITY_MAGNET      2
-#define ABILITY_DASH        3
-#define NUM_ABILITIES       4
+#define ABILITY_SHIELD 0
+#define ABILITY_MAGNET 1
+#define ABILITY_DASH   2
+#define NUM_ABILITIES  3
 
-// Called once when a run starts: resets charge/cooldown state
+// Called once when a run starts: clears owned abilities, resets charge/cooldown
+// state, and spawns the first pickup
 void ResetAbilities(void);
 
-// Called once per gameplay frame: reads input for the activatable abilities
-// (shield, dash) and advances their cooldowns
+// Called once per gameplay frame: checks for pickup collection, reads input for
+// the activatable abilities (shield, dash) and advances their cooldowns
 void UpdateAbilities(void);
 
-// Called right when the jump input fires; gives Double Jump a chance to
-// turn a quick second tap into a stronger boost
-void ApplyJumpAbility(void);
+bool OwnsAbility(int ability);
 
 // Pulls a coin towards the chicken when Coin Magnet is owned and in range;
 // returns the (possibly adjusted) coin position
@@ -36,5 +35,9 @@ bool ShieldIsActive(void);
 Rectangle ShieldButtonRect(int screenWidth, int screenHeight);
 Rectangle DashButtonRect(int screenWidth, int screenHeight);
 void DrawAbilityButtons(int screenWidth, int screenHeight);
+
+// The floating pickup that grants an ability for the rest of the run, if any is
+// still waiting to be found
+void DrawAbilityPickup(void);
 
 #endif // ABILITIES_H

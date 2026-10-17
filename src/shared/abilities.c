@@ -1,15 +1,14 @@
-// Purchasable gameplay abilities (double jump, shield, coin magnet, dash)
+// Gameplay abilities (shield, coin magnet, dash): collected as in-level pickups,
+// then active for the rest of the run (lost again on death)
 #include "abilities.h"
-#include "shop.h"
 #include "objects.h"
+#include "effects.h"
 #include "input.h"
 #include "menu.h"
 
 #include <raylib.h>
 #include <math.h>
-
-#define DOUBLE_JUMP_WINDOW_FRAMES 14   // tap jump again within this many frames for the boost
-#define DOUBLE_JUMP_BONUS 1.35f
+#include <stdlib.h>
 
 #define SHIELD_DURATION_FRAMES 90      // 1.5s of invulnerability at 60 fps
 #define SHIELD_COOLDOWN_FRAMES 600     // 10s before it can be used again
@@ -21,30 +20,86 @@
 #define MAGNET_RADIUS 150.0f
 #define MAGNET_PULL 0.12f
 
-static int lastJumpFrame = -1000;
+#define PICKUP_SIZE 48
+
 static int shieldCooldown = 0;
 static int shieldFramesLeft = 0;
 static int dashCooldown = 0;
 static int dashFramesLeft = 0;
+static int ownedMask = 0;
+
+static const char *abilityNames[NUM_ABILITIES] = { "SHIELD", "MAGNET", "DASH" };
+
+typedef struct AbilityPickup {
+    Vector2 pos;
+    int ability;
+    bool active;
+} AbilityPickup;
+
+static AbilityPickup pickup;
+
+static Color abilityColor(int ability) {
+    switch (ability) {
+        case ABILITY_SHIELD: return (Color){ 90, 170, 255, 255 };
+        case ABILITY_MAGNET: return (Color){ 230, 90, 90, 255 };
+        default:             return (Color){ 255, 160, 60, 255 };   // ABILITY_DASH
+    }
+}
+
+// Picks one of the abilities not yet owned this run and drops it somewhere on
+// screen; once every ability has been found, no further pickup spawns
+static void spawnAbilityPickup(void) {
+    int remaining[NUM_ABILITIES];
+    int count = 0;
+    for (int i = 0; i < NUM_ABILITIES; i++)
+        if (!((ownedMask >> i) & 1)) remaining[count++] = i;
+
+    if (count == 0) {
+        pickup.active = false;
+        return;
+    }
+
+    pickup.ability = remaining[rand() % count];
+    int genWidth = GetGamevars()->screenWidth - 2 * PICKUP_SIZE;
+    int genHeight = GetGamevars()->screenHeight - 2 * PICKUP_SIZE;
+    pickup.pos = (Vector2){
+        (float)(rand() % genWidth + PICKUP_SIZE),
+        (float)(rand() % genHeight + PICKUP_SIZE)
+    };
+    pickup.active = true;
+}
 
 void ResetAbilities(void) {
-    lastJumpFrame = -1000;
     shieldCooldown = 0;
     shieldFramesLeft = 0;
     dashCooldown = 0;
     dashFramesLeft = 0;
+    ownedMask = 0;
+    spawnAbilityPickup();
 }
 
-void ApplyJumpAbility(void) {
-    int frame = GetGamevars()->frameCounter;
-    if (OwnsAbility(ABILITY_DOUBLE_JUMP) && frame - lastJumpFrame <= DOUBLE_JUMP_WINDOW_FRAMES) {
-        // A quick second tap chains into a stronger boost instead of just resetting the jump
-        GetChicken()->velocityY = GetChicken()->jumpForce * DOUBLE_JUMP_BONUS;
-    }
-    lastJumpFrame = frame;
+bool OwnsAbility(int ability) {
+    return (ownedMask >> ability) & 1;
+}
+
+static void collectAbilityPickup(void) {
+    if (!pickup.active) return;
+
+    Rectangle pickupRect = { pickup.pos.x, pickup.pos.y, PICKUP_SIZE, PICKUP_SIZE };
+    Rectangle chickenRect = { GetChicken()->pos.x, GetChicken()->pos.y, CHICKEN_SIZE, CHICKEN_SIZE };
+    if (!CheckCollisionRecs(chickenRect, pickupRect)) return;
+
+    ownedMask |= 1 << pickup.ability;
+    SpawnParticles((Vector2){ pickup.pos.x + PICKUP_SIZE / 2.0f, pickup.pos.y + PICKUP_SIZE / 2.0f },
+                  20, abilityColor(pickup.ability), 5.0f, 6.0f);
+    SpawnPopup((Vector2){ pickup.pos.x + PICKUP_SIZE / 2.0f, pickup.pos.y - 10 },
+              abilityNames[pickup.ability], abilityColor(pickup.ability));
+    spawnAbilityPickup();
 }
 
 void UpdateAbilities(void) {
+    collectAbilityPickup();
+
     if (shieldCooldown > 0) shieldCooldown--;
     if (shieldFramesLeft > 0) shieldFramesLeft--;
     if (dashCooldown > 0) dashCooldown--;
@@ -121,4 +176,41 @@ void DrawAbilityButtons(int screenWidth, int screenHeight) {
                           (Color){ 255, 160, 60, 255 }, dashCooldown, DASH_COOLDOWN_FRAMES,
                           dashFramesLeft > 0);
     }
+}
+
+// Simple glyphs for the pickup (no spare art budget for new sprites)
+static void drawAbilityGlyph(int ability, Vector2 center) {
+    switch (ability) {
+        case ABILITY_SHIELD:
+            DrawPoly(center, 6, 20, 0, abilityColor(ABILITY_SHIELD));
+            DrawPolyLinesEx(center, 6, 20, 0, 3.0f, WHITE);
+            break;
+        case ABILITY_MAGNET:
+            DrawRing(center, 9, 18, 200, 340, 16, abilityColor(ABILITY_MAGNET));
+            DrawRing(center, 9, 18, 20, 160, 16, (Color){ 230, 230, 230, 255 });
+            break;
+        default:   // ABILITY_DASH
+            for (int i = 0; i < 3; i++) {
+                DrawTriangle((Vector2){ center.x - 16 + i * 11, center.y - 12 },
+                            (Vector2){ center.x - 16 + i * 11, center.y + 12 },
+                            (Vector2){ center.x - 5 + i * 11, center.y }, abilityColor(ABILITY_DASH));
+            }
+            break;
+    }
+}
+
+// Floats and glows gently so it reads as a collectible rather than part of the scenery
+void DrawAbilityPickup(void) {
+    if (!pickup.active) return;
+
+    float time = (float)GetTime();
+    float bob = 6.0f * sinf(time * 4.0f);
+    Vector2 center = { pickup.pos.x + PICKUP_SIZE / 2.0f, pickup.pos.y + PICKUP_SIZE / 2.0f + bob };
+
+    float glowPulse = 0.5f + 0.3f * sinf(time * 5.0f);
+    DrawCircleV(center, PICKUP_SIZE / 2.0f + 6, Fade(abilityColor(pickup.ability), glowPulse * 0.35f));
+    DrawCircleV(center, PICKUP_SIZE / 2.0f, Fade(BLACK, 0.45f));
+    drawAbilityGlyph(pickup.ability, center);
+    drawTextCentered(abilityNames[pickup.ability], (int)center.x, (int)(center.y + PICKUP_SIZE / 2.0f + 6),
+                     14, Fade(WHITE, 0.85f));
 }
