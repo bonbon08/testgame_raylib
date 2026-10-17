@@ -22,6 +22,7 @@ int main(void)
     Initgamevars();
     InitWindow(1080, 720, "Jumper Chicken");
     InitVirtualScreen(&GetGamevars()->screenWidth, &GetGamevars()->screenHeight);
+    InitAudioDevice();
     SetTargetFPS(60);
     srand((unsigned int)time(NULL));
 

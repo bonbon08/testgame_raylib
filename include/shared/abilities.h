@@ -1,5 +1,6 @@
-// Gameplay abilities (shield, coin magnet, dash): collected as in-level pickups,
-// then active for the rest of the run (lost again on death)
+// Gameplay abilities (shield, coin magnet, dash): collected as in-level pickups.
+// Each pickup is a single temporary charge, not a permanent upgrade - see
+// abilities.c for how each one activates and how long it lasts.
 #ifndef ABILITIES_H
 #define ABILITIES_H
 
@@ -11,17 +12,14 @@
 #define ABILITY_DASH   2
 #define NUM_ABILITIES  3
 
-// Called once when a run starts: clears owned abilities, resets charge/cooldown
-// state, and spawns the first pickup
+// Called once when a run starts: clears all charges and spawns the first pickup
 void ResetAbilities(void);
 
 // Called once per gameplay frame: checks for pickup collection, reads input for
-// the activatable abilities (shield, dash) and advances their cooldowns
+// the activatable abilities (shield, dash) and advances their active timers
 void UpdateAbilities(void);
 
-bool OwnsAbility(int ability);
-
-// Pulls a coin towards the chicken when Coin Magnet is owned and in range;
+// Pulls a coin towards the chicken while Coin Magnet is active and in range;
 // returns the (possibly adjusted) coin position
 Vector2 ApplyCoinMagnet(Vector2 coinPos, Vector2 chickenCenter);
 

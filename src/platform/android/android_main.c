@@ -26,6 +26,7 @@ int main(int argc, char *argv[])
     Initgamevars();
     InitWindow(0, 0, "Jumper Chicken");   // full screen on phones
     InitVirtualScreen(&GetGamevars()->screenWidth, &GetGamevars()->screenHeight);
+    InitAudioDevice();
     SetTargetFPS(60);
     srand((unsigned int)time(NULL));
 

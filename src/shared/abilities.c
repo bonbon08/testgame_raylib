@@ -1,5 +1,7 @@
-// Gameplay abilities (shield, coin magnet, dash): collected as in-level pickups,
-// then active for the rest of the run (lost again on death)
+// Gameplay abilities (shield, coin magnet, dash): collected as in-level pickups.
+// Each pickup is a single temporary charge, not a permanent upgrade - Magnet
+// kicks in immediately for a while, Shield and Dash wait for one button press
+// and then run for their duration before they're gone again.
 #include "abilities.h"
 #include "objects.h"
 #include "effects.h"
@@ -10,23 +12,21 @@
 #include <math.h>
 #include <stdlib.h>
 
-#define SHIELD_DURATION_FRAMES 90      // 1.5s of invulnerability at 60 fps
-#define SHIELD_COOLDOWN_FRAMES 600     // 10s before it can be used again
+#define SHIELD_DURATION_FRAMES 600     // 10s of invulnerability at 60 fps
+#define DASH_DURATION_FRAMES 600       // 10s boosted
+#define MAGNET_DURATION_FRAMES 1200    // 20s, starts the moment it's picked up
 
-#define DASH_DURATION_FRAMES 45        // 0.75s boosted
-#define DASH_COOLDOWN_FRAMES 420       // 7s before it can be used again
 #define DASH_SPEED_BONUS 9.0f
-
 #define MAGNET_RADIUS 150.0f
 #define MAGNET_PULL 0.12f
 
 #define PICKUP_SIZE 48
 
-static int shieldCooldown = 0;
-static int shieldFramesLeft = 0;
-static int dashCooldown = 0;
+static bool shieldAvailable = false;   // picked up, waiting for one press
+static int shieldFramesLeft = 0;       // >0 while the press is in effect
+static bool dashAvailable = false;
 static int dashFramesLeft = 0;
-static int ownedMask = 0;
+static int magnetFramesLeft = 0;
 
 static const char *abilityNames[NUM_ABILITIES] = { "SHIELD", "MAGNET", "DASH" };
 
@@ -46,20 +46,10 @@ static Color abilityColor(int ability) {
     }
 }
 
-// Picks one of the abilities not yet owned this run and drops it somewhere on
-// screen; once every ability has been found, no further pickup spawns
+// Drops a random ability pickup somewhere on screen; unlike a permanent
+// upgrade this can hand out the same ability again later in the run
 static void spawnAbilityPickup(void) {
-    int remaining[NUM_ABILITIES];
-    int count = 0;
-    for (int i = 0; i < NUM_ABILITIES; i++)
-        if (!((ownedMask >> i) & 1)) remaining[count++] = i;
-
-    if (count == 0) {
-        pickup.active = false;
-        return;
-    }
-
-    pickup.ability = remaining[rand() % count];
+    pickup.ability = rand() % NUM_ABILITIES;
     int genWidth = GetGamevars()->screenWidth - 2 * PICKUP_SIZE;
     int genHeight = GetGamevars()->screenHeight - 2 * PICKUP_SIZE;
     pickup.pos = (Vector2){
@@ -70,16 +60,12 @@ static void spawnAbilityPickup(void) {
 }
 
 void ResetAbilities(void) {
-    shieldCooldown = 0;
+    shieldAvailable = false;
     shieldFramesLeft = 0;
-    dashCooldown = 0;
+    dashAvailable = false;
     dashFramesLeft = 0;
-    ownedMask = 0;
+    magnetFramesLeft = 0;
     spawnAbilityPickup();
-}
-
-bool OwnsAbility(int ability) {
-    return (ownedMask >> ability) & 1;
 }
 
 static void collectAbilityPickup(void) {
@@ -89,7 +75,11 @@ static void collectAbilityPickup(void) {
     Rectangle chickenRect = { GetChicken()->pos.x, GetChicken()->pos.y, CHICKEN_SIZE, CHICKEN_SIZE };
     if (!CheckCollisionRecs(chickenRect, pickupRect)) return;
 
-    ownedMask |= 1 << pickup.ability;
+    switch (pickup.ability) {
+        case ABILITY_SHIELD: shieldAvailable = true; break;
+        case ABILITY_DASH:   dashAvailable = true; break;
+        default:              magnetFramesLeft = MAGNET_DURATION_FRAMES; break;   // ABILITY_MAGNET
+    }
     SpawnParticles((Vector2){ pickup.pos.x + PICKUP_SIZE / 2.0f, pickup.pos.y + PICKUP_SIZE / 2.0f },
                   20, abilityColor(pickup.ability), 5.0f, 6.0f);
     SpawnPopup((Vector2){ pickup.pos.x + PICKUP_SIZE / 2.0f, pickup.pos.y - 10 },
@@ -100,31 +90,30 @@ static void collectAbilityPickup(void) {
 void UpdateAbilities(void) {
     collectAbilityPickup();
 
-    if (shieldCooldown > 0) shieldCooldown--;
     if (shieldFramesLeft > 0) shieldFramesLeft--;
-    if (dashCooldown > 0) dashCooldown--;
     if (dashFramesLeft > 0) dashFramesLeft--;
+    if (magnetFramesLeft > 0) magnetFramesLeft--;
 
     int screenWidth = GetGamevars()->screenWidth;
     int screenHeight = GetGamevars()->screenHeight;
 
-    if (OwnsAbility(ABILITY_SHIELD) && shieldCooldown == 0 &&
+    if (shieldAvailable &&
         (IsKeyPressed(KEY_C) || PointerPressedIn(ShieldButtonRect(screenWidth, screenHeight)))) {
+        shieldAvailable = false;
         shieldFramesLeft = SHIELD_DURATION_FRAMES;
-        shieldCooldown = SHIELD_COOLDOWN_FRAMES;
         if (GetChicken()->invulnerable < SHIELD_DURATION_FRAMES)
             GetChicken()->invulnerable = SHIELD_DURATION_FRAMES;
     }
 
-    if (OwnsAbility(ABILITY_DASH) && dashCooldown == 0 &&
+    if (dashAvailable &&
         (IsKeyPressed(KEY_V) || PointerPressedIn(DashButtonRect(screenWidth, screenHeight)))) {
+        dashAvailable = false;
         dashFramesLeft = DASH_DURATION_FRAMES;
-        dashCooldown = DASH_COOLDOWN_FRAMES;
     }
 }
 
 Vector2 ApplyCoinMagnet(Vector2 coinPos, Vector2 chickenCenter) {
-    if (!OwnsAbility(ABILITY_MAGNET)) return coinPos;
+    if (magnetFramesLeft <= 0) return coinPos;
 
     float dx = chickenCenter.x - coinPos.x;
     float dy = chickenCenter.y - coinPos.y;
@@ -142,39 +131,44 @@ bool ShieldIsActive(void) {
     return shieldFramesLeft > 0;
 }
 
+#define ABILITY_BUTTON_SIZE 96.0f
+
 Rectangle ShieldButtonRect(int screenWidth, int screenHeight) {
-    return (Rectangle){ screenWidth - 170.0f, screenHeight - 170.0f, 64, 64 };
+    return (Rectangle){ screenWidth - 216.0f, screenHeight - 216.0f, ABILITY_BUTTON_SIZE, ABILITY_BUTTON_SIZE };
 }
 
 Rectangle DashButtonRect(int screenWidth, int screenHeight) {
-    return (Rectangle){ screenWidth - 90.0f, screenHeight - 170.0f, 64, 64 };
+    return (Rectangle){ screenWidth - 108.0f, screenHeight - 216.0f, ABILITY_BUTTON_SIZE, ABILITY_BUTTON_SIZE };
 }
 
+// `available` means it's picked up and waiting for one tap; `framesLeft` is
+// how long the tap's effect still has to run
 static void drawAbilityButton(Rectangle rect, const char *label, Color color,
-                              int cooldown, int maxCooldown, bool active) {
-    float fraction = maxCooldown > 0 ? (float)cooldown / maxCooldown : 0.0f;
+                              bool available, int framesLeft) {
+    bool active = framesLeft > 0;
     DrawRectangleRounded(rect, 0.3f, 8, Fade(BLACK, 0.45f));
-    DrawRectangleRounded(rect, 0.3f, 8, Fade(color, active ? 0.9f : (fraction > 0.0f ? 0.25f : 0.7f)));
-    DrawRectangleRoundedLinesEx(rect, 0.3f, 8, 2.0f, Fade(WHITE, 0.8f));
-    drawTextCentered(label, (int)(rect.x + rect.width / 2), (int)(rect.y + rect.height / 2 - 10), 18, WHITE);
-    if (fraction > 0.0f) {
-        int secondsLeft = cooldown / 60 + 1;
+    DrawRectangleRounded(rect, 0.3f, 8, Fade(color, active ? 0.9f : 0.6f));
+    DrawRectangleRoundedLinesEx(rect, 0.3f, 8, 2.0f, Fade(WHITE, available ? 1.0f : 0.5f));
+    drawTextCentered(label, (int)(rect.x + rect.width / 2), (int)(rect.y + rect.height / 2 - 12), 22, WHITE);
+    if (active) {
+        int secondsLeft = framesLeft / 60 + 1;
         drawTextCentered(TextFormat("%d", secondsLeft),
-                         (int)(rect.x + rect.width / 2), (int)(rect.y + rect.height / 2 + 10), 16,
+                         (int)(rect.x + rect.width / 2), (int)(rect.y + rect.height / 2 + 16), 18,
+                         Fade(WHITE, 0.85f));
+    } else {
+        drawTextCentered("TAP", (int)(rect.x + rect.width / 2), (int)(rect.y + rect.height / 2 + 16), 16,
                          Fade(WHITE, 0.85f));
     }
 }
 
 void DrawAbilityButtons(int screenWidth, int screenHeight) {
-    if (OwnsAbility(ABILITY_SHIELD)) {
+    if (shieldAvailable || shieldFramesLeft > 0) {
         drawAbilityButton(ShieldButtonRect(screenWidth, screenHeight), "SHLD",
-                          (Color){ 90, 170, 255, 255 }, shieldCooldown, SHIELD_COOLDOWN_FRAMES,
-                          ShieldIsActive());
+                          (Color){ 90, 170, 255, 255 }, shieldAvailable, shieldFramesLeft);
     }
-    if (OwnsAbility(ABILITY_DASH)) {
+    if (dashAvailable || dashFramesLeft > 0) {
         drawAbilityButton(DashButtonRect(screenWidth, screenHeight), "DASH",
-                          (Color){ 255, 160, 60, 255 }, dashCooldown, DASH_COOLDOWN_FRAMES,
-                          dashFramesLeft > 0);
+                          (Color){ 255, 160, 60, 255 }, dashAvailable, dashFramesLeft);
     }
 }
 
