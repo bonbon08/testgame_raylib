@@ -16,6 +16,8 @@ typedef struct SaveData {
     int musicOn;
     int hasHut;
     long hutLastCollect;   // unix timestamp of the last idle-coin payout, 0 = never
+    int ownedHats;
+    int hat;
 } SaveData;
 
 bool LoadSave(SaveData *save);

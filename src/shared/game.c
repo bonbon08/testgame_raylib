@@ -355,6 +355,13 @@ void DrawFrame(void) {
                 ? Fade(WHITE, 0.35f)
                 : WHITE;
         DrawChicken(CurrentCharacterTexture(GetChicken()->direction), tint);
+        if (!GetChicken()->dead) {
+            Vector2 chickenCenter = {
+                GetChicken()->pos.x + CHICKEN_SIZE / 2.0f,
+                GetChicken()->pos.y + CHICKEN_SIZE / 2.0f
+            };
+            DrawEquippedHat(chickenCenter, GetChicken()->rotation);
+        }
         if (CoopConnected()) DrawGhostChicken();
     }
     EndMode2D();

@@ -23,6 +23,8 @@ static void defaultSave(SaveData *save) {
     save->musicOn = 1;
     save->hasHut = 0;
     save->hutLastCollect = 0;
+    save->ownedHats = 1;
+    save->hat = 0;
 }
 
 static void sanitizeSave(SaveData *save) {
@@ -31,6 +33,7 @@ static void sanitizeSave(SaveData *save) {
     save->ownedCharacters |= 1;   // default items are always owned
     save->ownedBackgrounds |= 1;
     save->ownedMusic |= 1;
+    save->ownedHats |= 1;
     save->musicOn = save->musicOn != 0;
     save->hasHut = save->hasHut != 0;
     if (save->hutLastCollect < 0) save->hutLastCollect = 0;
@@ -75,6 +78,8 @@ bool LoadSave(SaveData *save) {
         else if (strcmp(key, "music_on") == 0) save->musicOn = (int)value;
         else if (strcmp(key, "has_hut") == 0) save->hasHut = (int)value;
         else if (strcmp(key, "hut_last_collect") == 0) save->hutLastCollect = value;
+        else if (strcmp(key, "owned_hats") == 0) save->ownedHats = (int)value;
+        else if (strcmp(key, "hat") == 0) save->hat = (int)value;
     }
     fclose(fp);
 
@@ -90,11 +95,11 @@ bool WriteSave(const SaveData *save) {
     bool ok = fprintf(fp,
         "highscore=%d\ncoins=%d\nowned_characters=%d\nowned_backgrounds=%d\nowned_music=%d\n"
         "character=%d\nbackground=%d\nmusic=%d\nmusic_on=%d\n"
-        "has_hut=%d\nhut_last_collect=%ld\n",
+        "has_hut=%d\nhut_last_collect=%ld\nowned_hats=%d\nhat=%d\n",
         save->highscore, save->coins,
         save->ownedCharacters, save->ownedBackgrounds, save->ownedMusic,
         save->character, save->background, save->music, save->musicOn,
-        save->hasHut, save->hutLastCollect) > 0;
+        save->hasHut, save->hutLastCollect, save->ownedHats, save->hat) > 0;
     if (fclose(fp) != 0) ok = false;
 
     if (!ok) {

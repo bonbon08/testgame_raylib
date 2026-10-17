@@ -40,19 +40,34 @@ typedef struct ShopItem {
 
 #define NUM_HUT_ITEMS 1
 static ShopItem hutItems[NUM_HUT_ITEMS] = {
-    { "Hut", 200 },
+    { "Nest", 200 },
 };
 
 // A coin every HUT_SECONDS_PER_COIN seconds of real time, capped at HUT_MAX_OFFLINE_SECONDS
 #define HUT_SECONDS_PER_COIN 120
 #define HUT_MAX_OFFLINE_SECONDS (24 * 60 * 60)
 
+// Purely cosmetic headwear; HAT_NONE is always owned and equipped by default
+#define HAT_NONE  0
+#define HAT_TOP   1
+#define HAT_PARTY 2
+#define HAT_CAP   3
+#define HAT_CROWN 4
+#define NUM_HATS  5
+static ShopItem hatItems[NUM_HATS] = {
+    { "None",      0 },
+    { "Top Hat",   60 },
+    { "Party Hat", 40 },
+    { "Cap",       30 },
+    { "Crown",     150 },
+};
+
 static const char *shopRowTitles[SHOP_ROWS] = {
-    "CHARACTERS", "BACKGROUNDS", "MUSIC", "HUT"
+    "CHARACTERS", "BACKGROUNDS", "MUSIC", "NEST", "HATS"
 };
 
 #define SHOP_PAGE_ITEMS 0
-#define SHOP_PAGE_HUT 1
+#define SHOP_PAGE_EXTRAS 1
 #define SHOP_PAGES 2
 
 typedef struct Shop {
@@ -118,32 +133,33 @@ int LastHutEarnings(void) {
     return Shopvars.lastHutEarnings;
 }
 
-// Characters, backgrounds and music can be equipped (one active item per row);
-// the hut is a one-off purchase with no "equipped" state.
+// Characters, backgrounds, music and hats can be equipped (one active item per
+// row); the nest is a one-off purchase with no "equipped" state.
 static bool rowHasEquip(int row) {
-    return row == ROW_CHARACTERS || row == ROW_BACKGROUNDS || row == ROW_MUSIC;
+    return row == ROW_CHARACTERS || row == ROW_BACKGROUNDS || row == ROW_MUSIC || row == ROW_HATS;
 }
 
 // Vertical slot a row is drawn at on its shop page (both pages start back at the top)
 static int rowSlot(int row) {
-    if (row == ROW_HUT) return 0;
+    if (row == ROW_HATS) return 0;
+    if (row == ROW_HUT) return 1;
     return row;   // ROW_CHARACTERS/BACKGROUNDS/MUSIC are already 0, 1, 2
 }
 
 static int rowsOnPage(int page) {
-    return page == SHOP_PAGE_ITEMS ? 3 : 1;
+    return page == SHOP_PAGE_ITEMS ? 3 : 2;
 }
 
 static int pageRow(int page, int slot) {
-    (void)slot;
     if (page == SHOP_PAGE_ITEMS) return slot;             // 0,1,2 -> CHARACTERS,BACKGROUNDS,MUSIC
-    return ROW_HUT;
+    return slot == 0 ? ROW_HATS : ROW_HUT;
 }
 
 static int shopRowSize(int row) {
     if (row == ROW_CHARACTERS) return NUM_CHARACTERS;
     if (row == ROW_BACKGROUNDS) return NUM_THEMES;
     if (row == ROW_MUSIC) return NUM_TRACKS;
+    if (row == ROW_HATS) return NUM_HATS;
     return NUM_HUT_ITEMS;
 }
 
@@ -151,6 +167,7 @@ static const char *shopItemName(int row, int item) {
     if (row == ROW_CHARACTERS) return characters[item].name;
     if (row == ROW_BACKGROUNDS) return themes[item].name;
     if (row == ROW_MUSIC) return tracks[item].name;
+    if (row == ROW_HATS) return hatItems[item].name;
     return hutItems[item].name;
 }
 
@@ -158,6 +175,7 @@ static int shopItemPrice(int row, int item) {
     if (row == ROW_CHARACTERS) return characters[item].price;
     if (row == ROW_BACKGROUNDS) return themes[item].price;
     if (row == ROW_MUSIC) return tracks[item].price;
+    if (row == ROW_HATS) return hatItems[item].price;
     return hutItems[item].price;
 }
 
@@ -176,9 +194,11 @@ void LoadGame(void) {
     Shopvars.owned[ROW_BACKGROUNDS] = save.ownedBackgrounds;
     Shopvars.owned[ROW_MUSIC] = save.ownedMusic;
     Shopvars.owned[ROW_HUT] = save.hasHut ? 1 : 0;
+    Shopvars.owned[ROW_HATS] = save.ownedHats;
     Shopvars.equipped[ROW_CHARACTERS] = validEquipped(ROW_CHARACTERS, save.character);
     Shopvars.equipped[ROW_BACKGROUNDS] = validEquipped(ROW_BACKGROUNDS, save.background);
     Shopvars.equipped[ROW_MUSIC] = validEquipped(ROW_MUSIC, save.music);
+    Shopvars.equipped[ROW_HATS] = validEquipped(ROW_HATS, save.hat);
     Shopvars.musicOn = save.musicOn;
     Shopvars.hutLastCollect = save.hutLastCollect;
 
@@ -211,6 +231,8 @@ void SaveGame(void) {
         .musicOn = Shopvars.musicOn,
         .hasHut = OwnsHut() ? 1 : 0,
         .hutLastCollect = Shopvars.hutLastCollect,
+        .ownedHats = Shopvars.owned[ROW_HATS],
+        .hat = Shopvars.equipped[ROW_HATS],
     };
     if (!WriteSave(&save)) TraceLog(LOG_WARNING, "Could not write save file data/save.txt");
 }
@@ -379,6 +401,90 @@ static void drawMusicIcon(Rectangle area, Color accent, bool playing) {
     }
 }
 
+// Rotates a world-space point around `pivot` by `angleDeg`, matching how the
+// chicken sprite itself is rotated (DrawTexturePro with the center as origin)
+static Vector2 rotateAround(Vector2 point, Vector2 pivot, float angleDeg) {
+    float rad = angleDeg * DEG2RAD;
+    float s = sinf(rad), c = cosf(rad);
+    float dx = point.x - pivot.x;
+    float dy = point.y - pivot.y;
+    return (Vector2){ pivot.x + dx * c - dy * s, pivot.y + dx * s + dy * c };
+}
+
+static void drawRotatedRect(Vector2 center, float halfWidth, float halfHeight,
+                            Vector2 pivot, float angleDeg, Color color) {
+    Vector2 p0 = rotateAround((Vector2){ center.x - halfWidth, center.y - halfHeight }, pivot, angleDeg);
+    Vector2 p1 = rotateAround((Vector2){ center.x + halfWidth, center.y - halfHeight }, pivot, angleDeg);
+    Vector2 p2 = rotateAround((Vector2){ center.x + halfWidth, center.y + halfHeight }, pivot, angleDeg);
+    Vector2 p3 = rotateAround((Vector2){ center.x - halfWidth, center.y + halfHeight }, pivot, angleDeg);
+    DrawTriangle(p0, p2, p1, color);
+    DrawTriangle(p0, p3, p2, color);
+}
+
+// Simple procedural glyphs (no spare art budget for new sprites). `anchor` is
+// the unrotated point the hat sits at (just above the head), `pivot` is what
+// it rotates around (the chicken's own center) and `angleDeg` its rotation.
+static void drawHat(int hat, Vector2 anchor, Vector2 pivot, float angleDeg, float scale) {
+    switch (hat) {
+        case HAT_TOP: {
+            Color black = (Color){ 30, 30, 35, 255 };
+            Color band = (Color){ 190, 40, 50, 255 };
+            drawRotatedRect((Vector2){ anchor.x, anchor.y - 19 * scale }, 13 * scale, 15 * scale,
+                            pivot, angleDeg, black);
+            drawRotatedRect((Vector2){ anchor.x, anchor.y - 6 * scale }, 13 * scale, 4 * scale,
+                            pivot, angleDeg, band);
+            drawRotatedRect((Vector2){ anchor.x, anchor.y }, 24 * scale, 4 * scale,
+                            pivot, angleDeg, black);
+            break;
+        }
+        case HAT_PARTY: {
+            Color cone = (Color){ 230, 90, 170, 255 };
+            Vector2 tip = rotateAround((Vector2){ anchor.x, anchor.y - 38 * scale }, pivot, angleDeg);
+            Vector2 baseL = rotateAround((Vector2){ anchor.x - 20 * scale, anchor.y }, pivot, angleDeg);
+            Vector2 baseR = rotateAround((Vector2){ anchor.x + 20 * scale, anchor.y }, pivot, angleDeg);
+            DrawTriangle(tip, baseL, baseR, cone);
+            DrawCircleV(tip, 6 * scale, (Color){ 255, 230, 120, 255 });
+            break;
+        }
+        case HAT_CAP: {
+            Color capColor = (Color){ 70, 120, 200, 255 };
+            Vector2 domeCenter = rotateAround((Vector2){ anchor.x, anchor.y - 8 * scale }, pivot, angleDeg);
+            DrawCircleV(domeCenter, 14 * scale, capColor);
+            Vector2 b0 = rotateAround((Vector2){ anchor.x + 8 * scale, anchor.y - 4 * scale }, pivot, angleDeg);
+            Vector2 b1 = rotateAround((Vector2){ anchor.x + 32 * scale, anchor.y - 2 * scale }, pivot, angleDeg);
+            Vector2 b2 = rotateAround((Vector2){ anchor.x + 8 * scale, anchor.y + 4 * scale }, pivot, angleDeg);
+            DrawTriangle(b0, b1, b2, capColor);
+            break;
+        }
+        default: {   // HAT_CROWN
+            Color gold = (Color){ 255, 205, 60, 255 };
+            Color jewel = (Color){ 210, 40, 60, 255 };
+            drawRotatedRect((Vector2){ anchor.x, anchor.y - 2 * scale }, 18 * scale, 6 * scale,
+                            pivot, angleDeg, gold);
+            float tipOffsets[3] = { -14, 0, 14 };
+            for (int i = 0; i < 3; i++) {
+                Vector2 tip = rotateAround((Vector2){ anchor.x + tipOffsets[i] * scale, anchor.y - 20 * scale },
+                                           pivot, angleDeg);
+                Vector2 l = rotateAround((Vector2){ anchor.x + (tipOffsets[i] - 7) * scale, anchor.y - 4 * scale },
+                                         pivot, angleDeg);
+                Vector2 r = rotateAround((Vector2){ anchor.x + (tipOffsets[i] + 7) * scale, anchor.y - 4 * scale },
+                                         pivot, angleDeg);
+                DrawTriangle(l, tip, r, gold);
+                DrawCircleV(tip, 3 * scale, jewel);
+            }
+            break;
+        }
+    }
+}
+
+// Drawn on top of the chicken during gameplay, right after DrawChicken()
+void DrawEquippedHat(Vector2 chickenCenter, float rotation) {
+    int hat = Shopvars.equipped[ROW_HATS];
+    if (hat == HAT_NONE) return;
+    Vector2 anchor = { chickenCenter.x, chickenCenter.y - 22.0f };
+    drawHat(hat, anchor, chickenCenter, rotation, 1.0f);
+}
+
 static void drawShopCard(int row, int col, int screenWidth, int screenHeight) {
     bool selected = pageRow(Shopvars.page, Shopvars.row) == row && Shopvars.col == col;
     int price = shopItemPrice(row, col);
@@ -403,6 +509,12 @@ static void drawShopCard(int row, int col, int screenWidth, int screenHeight) {
     } else if (row == ROW_MUSIC) {
         bool playing = PreviewedTrack() == col && MusicAudible();
         drawMusicIcon((Rectangle){ card.x + 14, card.y + 16, card.width - 28, 66 }, tracks[col].accent, playing);
+    } else if (row == ROW_HATS) {
+        Vector2 previewAnchor = { card.x + card.width / 2, card.y + 78 };
+        if (col == HAT_NONE)
+            DrawCircleLines((int)previewAnchor.x, (int)(previewAnchor.y - 10), 18, Fade(WHITE, 0.3f));
+        else
+            drawHat(col, previewAnchor, previewAnchor, 0.0f, 1.3f);
     } else {   // ROW_HUT
         Rectangle hutArea = { card.x + card.width / 2 - 34, card.y + 12, 68, 64 };
         DrawTriangle((Vector2){ hutArea.x + hutArea.width / 2, hutArea.y },
@@ -450,7 +562,7 @@ static void drawShopCard(int row, int col, int screenWidth, int screenHeight) {
 static void drawShopPageTab(int page, int screenWidth) {
     Rectangle rect = ShopPageTabRect(page, screenWidth);
     bool active = Shopvars.page == page;
-    const char *label = page == SHOP_PAGE_ITEMS ? "ITEMS" : "HUT";
+    const char *label = page == SHOP_PAGE_ITEMS ? "ITEMS" : "EXTRAS";
     DrawRectangleRounded(rect, 0.4f, 8, Fade(active ? MENU_ORANGE : BLACK, active ? 0.9f : 0.35f));
     drawTextCentered(label, (int)(rect.x + rect.width / 2), (int)(rect.y + 10), 18, WHITE);
 }
@@ -491,7 +603,7 @@ void DrawShop(int screenWidth, int screenHeight) {
                                Fade(Shopvars.messageColor, alpha));
     }
 
-    const char *hint = IS_MOBILE ? "Tap a card to choose   -   tap it again to buy / equip   -   tap ITEMS/HUT to switch page"
+    const char *hint = IS_MOBILE ? "Tap a card to choose   -   tap it again to buy / equip   -   tap ITEMS/EXTRAS to switch page"
                                  : "ARROWS to choose   -   X to buy / equip   -   TAB to switch page   -   BACKSPACE to go back";
     drawTextShadowCentered(hint, centerX, screenHeight - 34, 20, WHITE);
 }
