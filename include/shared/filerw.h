@@ -10,7 +10,6 @@ typedef struct SaveData {
     int ownedCharacters;
     int ownedBackgrounds;
     int ownedMusic;
-    int ownedAbilities;
     int character;
     int background;
     int music;

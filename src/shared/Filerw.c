@@ -17,7 +17,6 @@ static void defaultSave(SaveData *save) {
     save->ownedCharacters = 1;
     save->ownedBackgrounds = 1;
     save->ownedMusic = 1;
-    save->ownedAbilities = 0;
     save->character = 0;
     save->background = 0;
     save->music = 0;
@@ -74,7 +73,6 @@ bool LoadSave(SaveData *save) {
         else if (strcmp(key, "owned_music") == 0) save->ownedMusic = (int)value;
         else if (strcmp(key, "music") == 0) save->music = (int)value;
         else if (strcmp(key, "music_on") == 0) save->musicOn = (int)value;
-        else if (strcmp(key, "owned_abilities") == 0) save->ownedAbilities = (int)value;
         else if (strcmp(key, "has_hut") == 0) save->hasHut = (int)value;
         else if (strcmp(key, "hut_last_collect") == 0) save->hutLastCollect = value;
     }
@@ -92,11 +90,11 @@ bool WriteSave(const SaveData *save) {
     bool ok = fprintf(fp,
         "highscore=%d\ncoins=%d\nowned_characters=%d\nowned_backgrounds=%d\nowned_music=%d\n"
         "character=%d\nbackground=%d\nmusic=%d\nmusic_on=%d\n"
-        "owned_abilities=%d\nhas_hut=%d\nhut_last_collect=%ld\n",
+        "has_hut=%d\nhut_last_collect=%ld\n",
         save->highscore, save->coins,
         save->ownedCharacters, save->ownedBackgrounds, save->ownedMusic,
         save->character, save->background, save->music, save->musicOn,
-        save->ownedAbilities, save->hasHut, save->hutLastCollect) > 0;
+        save->hasHut, save->hutLastCollect) > 0;
     if (fclose(fp) != 0) ok = false;
 
     if (!ok) {

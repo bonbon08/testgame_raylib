@@ -1,4 +1,4 @@
-// Shop system: characters, backgrounds, music tracks, abilities, chicken coop
+// Shop system: characters, backgrounds, music tracks, hut
 #include "shop.h"
 #include "objects.h"
 #include "menu.h"
@@ -6,7 +6,6 @@
 #include "services.h"
 #include "background.h"
 #include "audio.h"
-#include "abilities.h"
 #include "effects.h"
 #include "filerw.h"
 
@@ -39,17 +38,9 @@ typedef struct ShopItem {
     int price;
 } ShopItem;
 
-// ABILITY_DOUBLE_JUMP, ABILITY_SHIELD, ABILITY_MAGNET, ABILITY_DASH (abilities.h)
-static ShopItem abilityItems[NUM_ABILITIES] = {
-    { "Double Jump", 60 },
-    { "Shield",      90 },
-    { "Coin Magnet", 50 },
-    { "Dash",        100 },
-};
-
 #define NUM_HUT_ITEMS 1
 static ShopItem hutItems[NUM_HUT_ITEMS] = {
-    { "Chicken Coop", 200 },
+    { "Hut", 200 },
 };
 
 // A coin every HUT_SECONDS_PER_COIN seconds of real time, capped at HUT_MAX_OFFLINE_SECONDS
@@ -57,11 +48,11 @@ static ShopItem hutItems[NUM_HUT_ITEMS] = {
 #define HUT_MAX_OFFLINE_SECONDS (24 * 60 * 60)
 
 static const char *shopRowTitles[SHOP_ROWS] = {
-    "CHARACTERS", "BACKGROUNDS", "MUSIC", "ABILITIES", "CHICKEN COOP"
+    "CHARACTERS", "BACKGROUNDS", "MUSIC", "HUT"
 };
 
 #define SHOP_PAGE_ITEMS 0
-#define SHOP_PAGE_ABILITIES 1
+#define SHOP_PAGE_HUT 1
 #define SHOP_PAGES 2
 
 typedef struct Shop {
@@ -119,10 +110,6 @@ static bool owns(int mask, int item) {
     return (mask >> item) & 1;
 }
 
-bool OwnsAbility(int ability) {
-    return owns(Shopvars.owned[ROW_ABILITIES], ability);
-}
-
 bool OwnsHut(void) {
     return owns(Shopvars.owned[ROW_HUT], 0);
 }
@@ -132,32 +119,31 @@ int LastHutEarnings(void) {
 }
 
 // Characters, backgrounds and music can be equipped (one active item per row);
-// abilities and the coop are one-off purchases with no "equipped" state.
+// the hut is a one-off purchase with no "equipped" state.
 static bool rowHasEquip(int row) {
     return row == ROW_CHARACTERS || row == ROW_BACKGROUNDS || row == ROW_MUSIC;
 }
 
 // Vertical slot a row is drawn at on its shop page (both pages start back at the top)
 static int rowSlot(int row) {
-    if (row == ROW_ABILITIES) return 0;
-    if (row == ROW_HUT) return 1;
+    if (row == ROW_HUT) return 0;
     return row;   // ROW_CHARACTERS/BACKGROUNDS/MUSIC are already 0, 1, 2
 }
 
 static int rowsOnPage(int page) {
-    return page == SHOP_PAGE_ITEMS ? 3 : 2;
+    return page == SHOP_PAGE_ITEMS ? 3 : 1;
 }
 
 static int pageRow(int page, int slot) {
+    (void)slot;
     if (page == SHOP_PAGE_ITEMS) return slot;             // 0,1,2 -> CHARACTERS,BACKGROUNDS,MUSIC
-    return slot == 0 ? ROW_ABILITIES : ROW_HUT;
+    return ROW_HUT;
 }
 
 static int shopRowSize(int row) {
     if (row == ROW_CHARACTERS) return NUM_CHARACTERS;
     if (row == ROW_BACKGROUNDS) return NUM_THEMES;
     if (row == ROW_MUSIC) return NUM_TRACKS;
-    if (row == ROW_ABILITIES) return NUM_ABILITIES;
     return NUM_HUT_ITEMS;
 }
 
@@ -165,7 +151,6 @@ static const char *shopItemName(int row, int item) {
     if (row == ROW_CHARACTERS) return characters[item].name;
     if (row == ROW_BACKGROUNDS) return themes[item].name;
     if (row == ROW_MUSIC) return tracks[item].name;
-    if (row == ROW_ABILITIES) return abilityItems[item].name;
     return hutItems[item].name;
 }
 
@@ -173,7 +158,6 @@ static int shopItemPrice(int row, int item) {
     if (row == ROW_CHARACTERS) return characters[item].price;
     if (row == ROW_BACKGROUNDS) return themes[item].price;
     if (row == ROW_MUSIC) return tracks[item].price;
-    if (row == ROW_ABILITIES) return abilityItems[item].price;
     return hutItems[item].price;
 }
 
@@ -191,7 +175,6 @@ void LoadGame(void) {
     Shopvars.owned[ROW_CHARACTERS] = save.ownedCharacters;
     Shopvars.owned[ROW_BACKGROUNDS] = save.ownedBackgrounds;
     Shopvars.owned[ROW_MUSIC] = save.ownedMusic;
-    Shopvars.owned[ROW_ABILITIES] = save.ownedAbilities;
     Shopvars.owned[ROW_HUT] = save.hasHut ? 1 : 0;
     Shopvars.equipped[ROW_CHARACTERS] = validEquipped(ROW_CHARACTERS, save.character);
     Shopvars.equipped[ROW_BACKGROUNDS] = validEquipped(ROW_BACKGROUNDS, save.background);
@@ -222,7 +205,6 @@ void SaveGame(void) {
         .ownedCharacters = Shopvars.owned[ROW_CHARACTERS],
         .ownedBackgrounds = Shopvars.owned[ROW_BACKGROUNDS],
         .ownedMusic = Shopvars.owned[ROW_MUSIC],
-        .ownedAbilities = Shopvars.owned[ROW_ABILITIES],
         .character = Shopvars.equipped[ROW_CHARACTERS],
         .background = Shopvars.equipped[ROW_BACKGROUNDS],
         .music = Shopvars.equipped[ROW_MUSIC],
@@ -397,32 +379,6 @@ static void drawMusicIcon(Rectangle area, Color accent, bool playing) {
     }
 }
 
-// Simple glyphs for the ability cards (no spare art budget for new sprites)
-static void drawAbilityIcon(int ability, Rectangle area) {
-    Vector2 center = { area.x + area.width / 2, area.y + area.height / 2 };
-    switch (ability) {
-        case ABILITY_DOUBLE_JUMP:
-            DrawCircleV((Vector2){ center.x, center.y + 10 }, 12, Fade(WHITE, 0.5f));
-            DrawCircleV((Vector2){ center.x, center.y - 8 }, 12, WHITE);
-            break;
-        case ABILITY_SHIELD:
-            DrawPoly(center, 6, 22, 0, (Color){ 90, 170, 255, 255 });
-            DrawPolyLinesEx(center, 6, 22, 0, 3.0f, WHITE);
-            break;
-        case ABILITY_MAGNET:
-            DrawRing(center, 10, 20, 200, 340, 16, (Color){ 230, 90, 90, 255 });
-            DrawRing(center, 10, 20, 20, 160, 16, (Color){ 230, 230, 230, 255 });
-            break;
-        default:   // ABILITY_DASH
-            for (int i = 0; i < 3; i++) {
-                DrawTriangle((Vector2){ center.x - 18 + i * 12, center.y - 14 },
-                            (Vector2){ center.x - 18 + i * 12, center.y + 14 },
-                            (Vector2){ center.x - 6 + i * 12, center.y }, (Color){ 255, 160, 60, 255 });
-            }
-            break;
-    }
-}
-
 static void drawShopCard(int row, int col, int screenWidth, int screenHeight) {
     bool selected = pageRow(Shopvars.page, Shopvars.row) == row && Shopvars.col == col;
     int price = shopItemPrice(row, col);
@@ -447,8 +403,6 @@ static void drawShopCard(int row, int col, int screenWidth, int screenHeight) {
     } else if (row == ROW_MUSIC) {
         bool playing = PreviewedTrack() == col && MusicAudible();
         drawMusicIcon((Rectangle){ card.x + 14, card.y + 16, card.width - 28, 66 }, tracks[col].accent, playing);
-    } else if (row == ROW_ABILITIES) {
-        drawAbilityIcon(col, (Rectangle){ card.x, card.y + 10, card.width, 76 });
     } else {   // ROW_HUT
         Rectangle hutArea = { card.x + card.width / 2 - 34, card.y + 12, 68, 64 };
         DrawTriangle((Vector2){ hutArea.x + hutArea.width / 2, hutArea.y },
@@ -496,7 +450,7 @@ static void drawShopCard(int row, int col, int screenWidth, int screenHeight) {
 static void drawShopPageTab(int page, int screenWidth) {
     Rectangle rect = ShopPageTabRect(page, screenWidth);
     bool active = Shopvars.page == page;
-    const char *label = page == SHOP_PAGE_ITEMS ? "ITEMS" : "ABILITIES";
+    const char *label = page == SHOP_PAGE_ITEMS ? "ITEMS" : "HUT";
     DrawRectangleRounded(rect, 0.4f, 8, Fade(active ? MENU_ORANGE : BLACK, active ? 0.9f : 0.35f));
     drawTextCentered(label, (int)(rect.x + rect.width / 2), (int)(rect.y + 10), 18, WHITE);
 }
@@ -537,7 +491,7 @@ void DrawShop(int screenWidth, int screenHeight) {
                                Fade(Shopvars.messageColor, alpha));
     }
 
-    const char *hint = IS_MOBILE ? "Tap a card to choose   -   tap it again to buy / equip   -   tap ITEMS/ABILITIES to switch page"
+    const char *hint = IS_MOBILE ? "Tap a card to choose   -   tap it again to buy / equip   -   tap ITEMS/HUT to switch page"
                                  : "ARROWS to choose   -   X to buy / equip   -   TAB to switch page   -   BACKSPACE to go back";
     drawTextShadowCentered(hint, centerX, screenHeight - 34, 20, WHITE);
 }
