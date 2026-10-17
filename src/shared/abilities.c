@@ -1,11 +1,11 @@
 // Gameplay abilities (shield, coin magnet, dash): collected as in-level pickups.
-// Each pickup is a single temporary charge, not a permanent upgrade - Magnet
-// kicks in immediately for a while, Shield and Dash wait for one button press
-// and then run for their duration before they're gone again.
+// Each pickup activates instantly and runs for a fixed duration, then it's
+// gone again - no permanent upgrade, no button to press. Only abilities
+// unlocked in the shop (shop.c, ROW_ABILITIES) ever spawn as pickups.
 #include "abilities.h"
 #include "objects.h"
 #include "effects.h"
-#include "input.h"
+#include "shop.h"
 #include "menu.h"
 
 #include <raylib.h>
@@ -13,20 +13,23 @@
 #include <stdlib.h>
 
 #define SHIELD_DURATION_FRAMES 600     // 10s of invulnerability at 60 fps
-#define DASH_DURATION_FRAMES 600       // 10s boosted
-#define MAGNET_DURATION_FRAMES 1200    // 20s, starts the moment it's picked up
 
+#define DASH_DURATION_FRAMES 30        // 0.5s brief speed burst
+#define DASH_GRACE_FRAMES 180          // 3s invulnerable right after, so the
+                                        // speed boost doesn't dump you into a spike
 #define DASH_SPEED_BONUS 9.0f
+
+#define MAGNET_DURATION_FRAMES 1200    // 20s, starts the moment it's picked up
 #define MAGNET_RADIUS 150.0f
 #define MAGNET_PULL 0.12f
 
 #define PICKUP_SIZE 48
+#define PICKUP_RESPAWN_FRAMES (25 * 60)   // pickups are rare: ~25s between them
 
-static bool shieldAvailable = false;   // picked up, waiting for one press
-static int shieldFramesLeft = 0;       // >0 while the press is in effect
-static bool dashAvailable = false;
+static int shieldFramesLeft = 0;
 static int dashFramesLeft = 0;
 static int magnetFramesLeft = 0;
+static int pickupCooldown = 0;   // frames until the next pickup is allowed to spawn
 
 static const char *abilityNames[NUM_ABILITIES] = { "SHIELD", "MAGNET", "DASH" };
 
@@ -46,10 +49,20 @@ static Color abilityColor(int ability) {
     }
 }
 
-// Drops a random ability pickup somewhere on screen; unlike a permanent
-// upgrade this can hand out the same ability again later in the run
+// Drops a random *unlocked* ability pickup somewhere on screen. If nothing
+// has been unlocked in the shop yet, nothing spawns at all.
 static void spawnAbilityPickup(void) {
-    pickup.ability = rand() % NUM_ABILITIES;
+    int unlocked[NUM_ABILITIES];
+    int count = 0;
+    for (int i = 0; i < NUM_ABILITIES; i++)
+        if (AbilityUnlocked(i)) unlocked[count++] = i;
+
+    if (count == 0) {
+        pickup.active = false;
+        return;
+    }
+
+    pickup.ability = unlocked[rand() % count];
     int genWidth = GetGamevars()->screenWidth - 2 * PICKUP_SIZE;
     int genHeight = GetGamevars()->screenHeight - 2 * PICKUP_SIZE;
     pickup.pos = (Vector2){
@@ -60,12 +73,11 @@ static void spawnAbilityPickup(void) {
 }
 
 void ResetAbilities(void) {
-    shieldAvailable = false;
     shieldFramesLeft = 0;
-    dashAvailable = false;
     dashFramesLeft = 0;
     magnetFramesLeft = 0;
-    spawnAbilityPickup();
+    pickup.active = false;
+    pickupCooldown = PICKUP_RESPAWN_FRAMES;
 }
 
 static void collectAbilityPickup(void) {
@@ -76,40 +88,43 @@ static void collectAbilityPickup(void) {
     if (!CheckCollisionRecs(chickenRect, pickupRect)) return;
 
     switch (pickup.ability) {
-        case ABILITY_SHIELD: shieldAvailable = true; break;
-        case ABILITY_DASH:   dashAvailable = true; break;
-        default:              magnetFramesLeft = MAGNET_DURATION_FRAMES; break;   // ABILITY_MAGNET
+        case ABILITY_SHIELD:
+            shieldFramesLeft = SHIELD_DURATION_FRAMES;
+            if (GetChicken()->invulnerable < SHIELD_DURATION_FRAMES)
+                GetChicken()->invulnerable = SHIELD_DURATION_FRAMES;
+            break;
+        case ABILITY_DASH:
+            dashFramesLeft = DASH_DURATION_FRAMES;
+            break;
+        default:   // ABILITY_MAGNET
+            magnetFramesLeft = MAGNET_DURATION_FRAMES;
+            break;
     }
     SpawnParticles((Vector2){ pickup.pos.x + PICKUP_SIZE / 2.0f, pickup.pos.y + PICKUP_SIZE / 2.0f },
                   20, abilityColor(pickup.ability), 5.0f, 6.0f);
     SpawnPopup((Vector2){ pickup.pos.x + PICKUP_SIZE / 2.0f, pickup.pos.y - 10 },
               abilityNames[pickup.ability], abilityColor(pickup.ability));
-    spawnAbilityPickup();
+    pickup.active = false;
+    pickupCooldown = PICKUP_RESPAWN_FRAMES;
 }
 
 void UpdateAbilities(void) {
     collectAbilityPickup();
 
+    if (!pickup.active) {
+        if (pickupCooldown > 0) pickupCooldown--;
+        else spawnAbilityPickup();
+    }
+
     if (shieldFramesLeft > 0) shieldFramesLeft--;
-    if (dashFramesLeft > 0) dashFramesLeft--;
+
+    if (dashFramesLeft > 0) {
+        dashFramesLeft--;
+        if (dashFramesLeft == 0 && GetChicken()->invulnerable < DASH_GRACE_FRAMES)
+            GetChicken()->invulnerable = DASH_GRACE_FRAMES;
+    }
+
     if (magnetFramesLeft > 0) magnetFramesLeft--;
-
-    int screenWidth = GetGamevars()->screenWidth;
-    int screenHeight = GetGamevars()->screenHeight;
-
-    if (shieldAvailable &&
-        (IsKeyPressed(KEY_C) || PointerPressedIn(ShieldButtonRect(screenWidth, screenHeight)))) {
-        shieldAvailable = false;
-        shieldFramesLeft = SHIELD_DURATION_FRAMES;
-        if (GetChicken()->invulnerable < SHIELD_DURATION_FRAMES)
-            GetChicken()->invulnerable = SHIELD_DURATION_FRAMES;
-    }
-
-    if (dashAvailable &&
-        (IsKeyPressed(KEY_V) || PointerPressedIn(DashButtonRect(screenWidth, screenHeight)))) {
-        dashAvailable = false;
-        dashFramesLeft = DASH_DURATION_FRAMES;
-    }
 }
 
 Vector2 ApplyCoinMagnet(Vector2 coinPos, Vector2 chickenCenter) {
@@ -125,51 +140,6 @@ Vector2 ApplyCoinMagnet(Vector2 coinPos, Vector2 chickenCenter) {
 
 float DashSpeedBonus(void) {
     return dashFramesLeft > 0 ? DASH_SPEED_BONUS : 0.0f;
-}
-
-bool ShieldIsActive(void) {
-    return shieldFramesLeft > 0;
-}
-
-#define ABILITY_BUTTON_SIZE 96.0f
-
-Rectangle ShieldButtonRect(int screenWidth, int screenHeight) {
-    return (Rectangle){ screenWidth - 216.0f, screenHeight - 216.0f, ABILITY_BUTTON_SIZE, ABILITY_BUTTON_SIZE };
-}
-
-Rectangle DashButtonRect(int screenWidth, int screenHeight) {
-    return (Rectangle){ screenWidth - 108.0f, screenHeight - 216.0f, ABILITY_BUTTON_SIZE, ABILITY_BUTTON_SIZE };
-}
-
-// `available` means it's picked up and waiting for one tap; `framesLeft` is
-// how long the tap's effect still has to run
-static void drawAbilityButton(Rectangle rect, const char *label, Color color,
-                              bool available, int framesLeft) {
-    bool active = framesLeft > 0;
-    DrawRectangleRounded(rect, 0.3f, 8, Fade(BLACK, 0.45f));
-    DrawRectangleRounded(rect, 0.3f, 8, Fade(color, active ? 0.9f : 0.6f));
-    DrawRectangleRoundedLinesEx(rect, 0.3f, 8, 2.0f, Fade(WHITE, available ? 1.0f : 0.5f));
-    drawTextCentered(label, (int)(rect.x + rect.width / 2), (int)(rect.y + rect.height / 2 - 12), 22, WHITE);
-    if (active) {
-        int secondsLeft = framesLeft / 60 + 1;
-        drawTextCentered(TextFormat("%d", secondsLeft),
-                         (int)(rect.x + rect.width / 2), (int)(rect.y + rect.height / 2 + 16), 18,
-                         Fade(WHITE, 0.85f));
-    } else {
-        drawTextCentered("TAP", (int)(rect.x + rect.width / 2), (int)(rect.y + rect.height / 2 + 16), 16,
-                         Fade(WHITE, 0.85f));
-    }
-}
-
-void DrawAbilityButtons(int screenWidth, int screenHeight) {
-    if (shieldAvailable || shieldFramesLeft > 0) {
-        drawAbilityButton(ShieldButtonRect(screenWidth, screenHeight), "SHLD",
-                          (Color){ 90, 170, 255, 255 }, shieldAvailable, shieldFramesLeft);
-    }
-    if (dashAvailable || dashFramesLeft > 0) {
-        drawAbilityButton(DashButtonRect(screenWidth, screenHeight), "DASH",
-                          (Color){ 255, 160, 60, 255 }, dashAvailable, dashFramesLeft);
-    }
 }
 
 // Simple glyphs for the pickup (no spare art budget for new sprites)

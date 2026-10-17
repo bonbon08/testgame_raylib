@@ -1,4 +1,4 @@
-// Shop system: characters, backgrounds, music tracks, hut
+// Shop system: characters, backgrounds, music tracks, nest, hats, ability unlocks
 #include "shop.h"
 #include "objects.h"
 #include "menu.h"
@@ -62,8 +62,16 @@ static ShopItem hatItems[NUM_HATS] = {
     { "Crown",     150 },
 };
 
+// Unlocking an ability here just lets its pickup spawn in a level (abilities.c);
+// it's not equipped and doesn't do anything by itself
+static ShopItem abilityItems[NUM_ABILITIES] = {
+    { "Shield", 500 },
+    { "Magnet", 500 },
+    { "Dash",   500 },
+};
+
 static const char *shopRowTitles[SHOP_ROWS] = {
-    "CHARACTERS", "BACKGROUNDS", "MUSIC", "NEST", "HATS"
+    "CHARACTERS", "BACKGROUNDS", "MUSIC", "NEST", "HATS", "ABILITIES"
 };
 
 #define SHOP_PAGE_ITEMS 0
@@ -133,8 +141,12 @@ int LastHutEarnings(void) {
     return Shopvars.lastHutEarnings;
 }
 
+bool AbilityUnlocked(int ability) {
+    return owns(Shopvars.owned[ROW_ABILITIES], ability);
+}
+
 // Characters, backgrounds, music and hats can be equipped (one active item per
-// row); the nest is a one-off purchase with no "equipped" state.
+// row); the nest and ability unlocks are one-off purchases with no "equipped" state.
 static bool rowHasEquip(int row) {
     return row == ROW_CHARACTERS || row == ROW_BACKGROUNDS || row == ROW_MUSIC || row == ROW_HATS;
 }
@@ -143,16 +155,19 @@ static bool rowHasEquip(int row) {
 static int rowSlot(int row) {
     if (row == ROW_HATS) return 0;
     if (row == ROW_HUT) return 1;
+    if (row == ROW_ABILITIES) return 2;
     return row;   // ROW_CHARACTERS/BACKGROUNDS/MUSIC are already 0, 1, 2
 }
 
 static int rowsOnPage(int page) {
-    return page == SHOP_PAGE_ITEMS ? 3 : 2;
+    (void)page;
+    return 3;   // both pages hold exactly 3 rows now
 }
 
 static int pageRow(int page, int slot) {
     if (page == SHOP_PAGE_ITEMS) return slot;             // 0,1,2 -> CHARACTERS,BACKGROUNDS,MUSIC
-    return slot == 0 ? ROW_HATS : ROW_HUT;
+    if (slot == 0) return ROW_HATS;
+    return slot == 1 ? ROW_HUT : ROW_ABILITIES;
 }
 
 static int shopRowSize(int row) {
@@ -160,6 +175,7 @@ static int shopRowSize(int row) {
     if (row == ROW_BACKGROUNDS) return NUM_THEMES;
     if (row == ROW_MUSIC) return NUM_TRACKS;
     if (row == ROW_HATS) return NUM_HATS;
+    if (row == ROW_ABILITIES) return NUM_ABILITIES;
     return NUM_HUT_ITEMS;
 }
 
@@ -168,6 +184,7 @@ static const char *shopItemName(int row, int item) {
     if (row == ROW_BACKGROUNDS) return themes[item].name;
     if (row == ROW_MUSIC) return tracks[item].name;
     if (row == ROW_HATS) return hatItems[item].name;
+    if (row == ROW_ABILITIES) return abilityItems[item].name;
     return hutItems[item].name;
 }
 
@@ -176,6 +193,7 @@ static int shopItemPrice(int row, int item) {
     if (row == ROW_BACKGROUNDS) return themes[item].price;
     if (row == ROW_MUSIC) return tracks[item].price;
     if (row == ROW_HATS) return hatItems[item].price;
+    if (row == ROW_ABILITIES) return abilityItems[item].price;
     return hutItems[item].price;
 }
 
@@ -195,6 +213,7 @@ void LoadGame(void) {
     Shopvars.owned[ROW_MUSIC] = save.ownedMusic;
     Shopvars.owned[ROW_HUT] = save.hasHut ? 1 : 0;
     Shopvars.owned[ROW_HATS] = save.ownedHats;
+    Shopvars.owned[ROW_ABILITIES] = save.unlockedAbilities;
     Shopvars.equipped[ROW_CHARACTERS] = validEquipped(ROW_CHARACTERS, save.character);
     Shopvars.equipped[ROW_BACKGROUNDS] = validEquipped(ROW_BACKGROUNDS, save.background);
     Shopvars.equipped[ROW_MUSIC] = validEquipped(ROW_MUSIC, save.music);
@@ -233,6 +252,7 @@ void SaveGame(void) {
         .hutLastCollect = Shopvars.hutLastCollect,
         .ownedHats = Shopvars.owned[ROW_HATS],
         .hat = Shopvars.equipped[ROW_HATS],
+        .unlockedAbilities = Shopvars.owned[ROW_ABILITIES],
     };
     if (!WriteSave(&save)) TraceLog(LOG_WARNING, "Could not write save file data/save.txt");
 }
@@ -485,6 +505,28 @@ void DrawEquippedHat(Vector2 chickenCenter, float rotation) {
     drawHat(hat, anchor, chickenCenter, rotation, 1.0f);
 }
 
+// Simple glyphs matching the in-level pickup's look (abilities.c), so an
+// unlocked ability is recognizable later when it shows up as a pickup
+static void drawAbilityShopIcon(int ability, Vector2 center) {
+    switch (ability) {
+        case ABILITY_SHIELD:
+            DrawPoly(center, 6, 22, 0, (Color){ 90, 170, 255, 255 });
+            DrawPolyLinesEx(center, 6, 22, 0, 3.0f, WHITE);
+            break;
+        case ABILITY_MAGNET:
+            DrawRing(center, 10, 20, 200, 340, 16, (Color){ 230, 90, 90, 255 });
+            DrawRing(center, 10, 20, 20, 160, 16, (Color){ 230, 230, 230, 255 });
+            break;
+        default:   // ABILITY_DASH
+            for (int i = 0; i < 3; i++) {
+                DrawTriangle((Vector2){ center.x - 18 + i * 12, center.y - 14 },
+                            (Vector2){ center.x - 18 + i * 12, center.y + 14 },
+                            (Vector2){ center.x - 6 + i * 12, center.y }, (Color){ 255, 160, 60, 255 });
+            }
+            break;
+    }
+}
+
 static void drawShopCard(int row, int col, int screenWidth, int screenHeight) {
     bool selected = pageRow(Shopvars.page, Shopvars.row) == row && Shopvars.col == col;
     int price = shopItemPrice(row, col);
@@ -515,6 +557,8 @@ static void drawShopCard(int row, int col, int screenWidth, int screenHeight) {
             DrawCircleLines((int)previewAnchor.x, (int)(previewAnchor.y - 10), 18, Fade(WHITE, 0.3f));
         else
             drawHat(col, previewAnchor, previewAnchor, 0.0f, 1.3f);
+    } else if (row == ROW_ABILITIES) {
+        drawAbilityShopIcon(col, (Vector2){ card.x + card.width / 2, card.y + 48 });
     } else {   // ROW_HUT
         Rectangle hutArea = { card.x + card.width / 2 - 34, card.y + 12, 68, 64 };
         DrawTriangle((Vector2){ hutArea.x + hutArea.width / 2, hutArea.y },

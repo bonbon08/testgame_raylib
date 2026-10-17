@@ -1,17 +1,20 @@
-// Shop system (characters, backgrounds, music, hats, nest)
+// Shop system (characters, backgrounds, music, hats, nest, abilities)
 #ifndef SHOP_H
 #define SHOP_H
+
+#include "abilities.h"
 
 #include <raylib.h>
 #include <stdbool.h>
 
 #define NUM_CHARACTERS 5
-#define SHOP_ROWS 5
+#define SHOP_ROWS 6
 #define ROW_CHARACTERS 0
 #define ROW_BACKGROUNDS 1
 #define ROW_MUSIC 2
 #define ROW_HUT 3
 #define ROW_HATS 4
+#define ROW_ABILITIES 5
 
 // Called once at startup/shutdown (needs a GL context, so after InitWindow)
 void InitCharacters(void);
@@ -41,5 +44,9 @@ int LastHutEarnings(void);   // coins credited since the save was last loaded, 0
 // Hats: purely cosmetic headwear, equip one at a time like characters/backgrounds/music.
 // Drawn on top of the chicken during gameplay.
 void DrawEquippedHat(Vector2 chickenCenter, float rotation);
+
+// Abilities (see abilities.h for the ABILITY_* indices): a one-off unlock per
+// ability, bought here before its pickup can ever spawn in a level.
+bool AbilityUnlocked(int ability);
 
 #endif // SHOP_H
