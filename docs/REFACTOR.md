@@ -102,17 +102,13 @@ Die Datei `android/app/src/main/cpp/CMakeLists.txt` wurde aktualisiert:
 
 ## Bekannte Einschränkungen / Offene Punkte
 
-- Einige Header-Dateien enthalten noch Platzhalter oder vereinfachte APIs (z.B. `shop.h` hat vereinfachte Accessors). Die vollständige Implementierung aller Accessor-Funktionen könnte in einer späteren Version erfolgen.
-- Die Android-`CMakeLists.txt` referenziert weiterhin `main.c` als einziger Quellfile für die Shared Library; für die volle V2-Struktur muss die Android-CMake alle `src/shared/*.c` Dateien einbinden.
-- Einige Module (z.B. `audio.c`) enthalten vereinfachte Versionen der Musikdaten (nur Spuren-Definitionen, keine vollständigen Synthese-Algorithmen).
+- Die alten V1-Dateien (`src/main.c`, `src/objects.c`, etc.) wurden beim Refactoring versehentlich nicht gelöscht und lagen bis zu diesem Commit tot neben der V2-Struktur herum (von keinem Build eingebunden). Sie wurden entfernt.
 
 ## Nächste Schritte (für Entwickler)
 
-1. Überprüfen Sie alle `.c`-Dateien auf Konsistenz (z.B. `objects.c` verwendet globale Variablen, die in `game.c` referenziert werden)
-2. Testen Sie Desktop-Build (`cmake .; make`)
-3. Testen Sie Android-Build (`./gradlew assembleDebug`)
-4. Ergänzen Sie fehlende Accessor-Funktionen (z.B. `GetShopEquippedMusic()`)
-5. Aktualisieren Sie `docs/` bei weiteren Änderungen
+1. Testen Sie Desktop-Build (`cmake .; make`)
+2. Testen Sie Android-Build (`./gradlew assembleDebug`)
+3. Aktualisieren Sie `docs/` bei weiteren Änderungen
 
 ---
 *Version 2.0 – Refactoring abgeschlossen.*

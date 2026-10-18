@@ -16,6 +16,7 @@
 #include "shared/menu.h"
 #include "shared/shop.h"
 #include "shared/coop.h"
+#include "shared/twitchplays.h"
 #include "shared/filerw.h"
 
 int main(int argc, char *argv[])
@@ -34,6 +35,7 @@ int main(int argc, char *argv[])
     LoadGame();
     InitAds();
     InitCoop();
+    InitTwitchPlays();
     SubmitLeaderboardScore(GetGamevars()->highscore);
     Initplayer(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
     InitSpikes(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
@@ -67,6 +69,7 @@ int main(int argc, char *argv[])
 
     SaveGame();
 
+    CloseTwitchPlays();
     CloseCoop();
     CloseAds();
     CloseGameAudio();

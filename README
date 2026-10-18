@@ -12,7 +12,7 @@ Alternatively, `run.sh` cleans previous build files, rebuilds and starts the gam
 
 ## Controls
 
-- Desktop: X / Space / click to jump, arrow keys + X in menus, BACKSPACE to go back, M toggles music
+- Desktop: X / Space / click to jump, hold DOWN / S / right mouse button (or a side mouse button) to fall faster, arrow keys + X in menus, BACKSPACE to go back, M toggles music
 - Android: tap to jump and to use the menus, the back button goes back
 
 ## Music and sound
@@ -21,6 +21,15 @@ The background music is chiptune synthesized at runtime in `src/audio.c` (no mus
 Each track is a few lines of note data: chords, a melody, a bass and a drum pattern.
 Four tracks are included; "Sunny Hop" is free, the others can be bought in the shop.
 The jump sound is generated the same way. Music can be switched off in the main menu.
+
+## Twitch Plays
+
+Press the TWITCH PLAY button in the main menu (both desktop and Android) and type a Twitch
+channel name to connect. The game joins that channel's chat anonymously (read-only, no login
+needed) and lets everyone currently chatting fly the chicken together: every half second it
+tallies how many people typed "jump" vs. "fall"/"down" and acts on whichever is ahead. Since
+chat has no real participant limit, this is how the game supports arbitrarily large groups -
+including the thousands of viewers a stream can have - without needing a game server of our own.
 
 ## Android
 
