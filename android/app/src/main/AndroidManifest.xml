@@ -15,6 +15,9 @@
         tools:targetApi="s" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
 
+    <!-- Twitch Plays mode: a plain socket to Twitch's chat server -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:name=".JumperChickenApp"
         android:label="@string/app_name"

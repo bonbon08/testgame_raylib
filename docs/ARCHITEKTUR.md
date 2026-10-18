@@ -24,6 +24,8 @@ Das Spiel folgt einer geschichteten Architektur:
 | **Hintergrund** | `src/shared/background.c` | Themen (Day, Sunset, Night, Candy), Wolken, Berge, Sterne |
 | **Effekte** | `src/shared/effects.c` | Partikel, Popups, Bildschirmschüttelung |
 | **Services** | `src/shared/services.c` | Werbung (AdMob), Leaderboard (Play Games), I/O-Abstraktion |
+| **Co-op** | `src/shared/coop.c` | Lokales Zwei-Spieler-Koop über Bluetooth (nur Android) |
+| **Twitch Plays** | `src/shared/twitchplays.c` | Chat-Abstimmung steuert das Huhn über eine reine TCP-Verbindung zu Twitch (beide Plattformen) |
 | **Dateisystem** | `src/shared/filerw.c` | Spielstand speichern/laden (key=value Format) |
 | **Ressourcen** | `data/*` | Bilder (PNG), Sounds (WAV) |
 

@@ -63,10 +63,14 @@ Rectangle CoopButtonRect(int screenWidth, int screenHeight) {
     return (Rectangle){ 24, screenHeight - 64, 180, 44 };
 }
 
+Rectangle TwitchPlaysButtonRect(int screenWidth, int screenHeight) {
+    return (Rectangle){ screenWidth / 2.0f - 90, screenHeight - 64, 180, 44 };
+}
+
 void DrawMainMenu(int screenWidth, int screenHeight, int selected, Texture2D chickenTexture,
                   int highscore, int coins, bool showPrivacy, bool musicOn,
                   bool showLeaderboard, const char *playerName, int signInState,
-                  bool showCoop) {
+                  bool showCoop, bool showTwitchPlays) {
     int centerX = screenWidth / 2;
     float time = (float)GetTime();
 
@@ -132,6 +136,10 @@ void DrawMainMenu(int screenWidth, int screenHeight, int selected, Texture2D chi
     if (showCoop)
         drawButton(CoopButtonRect(screenWidth, screenHeight), "CO-OP", 20,
                    (Color){ 90, 170, 255, 255 }, 1.0f);
+
+    if (showTwitchPlays)
+        drawButton(TwitchPlaysButtonRect(screenWidth, screenHeight), "TWITCH PLAY", 18,
+                   (Color){ 145, 70, 220, 255 }, 1.0f);
 }
 
 static Rectangle deathPanelRect(int screenWidth, int screenHeight,

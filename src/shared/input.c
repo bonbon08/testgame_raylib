@@ -89,3 +89,16 @@ bool PointerPressedIn(Rectangle area) {
 bool BackPressed(void) {
     return IsKeyPressed(KEY_BACKSPACE) || IsKeyPressed(KEY_BACK);
 }
+
+// DOWN/S key or an extra mouse button (right-click or a side button) on desktop;
+// there's no sensible equivalent gesture on a phone touchscreen, so always false there
+bool FastFallHeld(void) {
+#if defined(PLATFORM_ANDROID)
+    return false;
+#else
+    return IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S) ||
+           IsMouseButtonDown(MOUSE_BUTTON_RIGHT) ||
+           IsMouseButtonDown(MOUSE_BUTTON_SIDE) ||
+           IsMouseButtonDown(MOUSE_BUTTON_EXTRA);
+#endif
+}

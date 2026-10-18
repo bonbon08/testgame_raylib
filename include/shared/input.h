@@ -23,6 +23,9 @@ bool PointerPressedIn(Rectangle area);
 // Back button pressed (BACKSPACE on desktop, back button on Android)
 bool BackPressed(void);
 
+// Fast-fall held (desktop only: DOWN/S key or the right/side mouse button; always false on Android)
+bool FastFallHeld(void);
+
 // Virtual screen management
 void InitVirtualScreen(int *width, int *height);
 void BeginVirtualScreen(void);

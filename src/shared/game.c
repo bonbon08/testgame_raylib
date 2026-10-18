@@ -15,11 +15,13 @@
 #include "shop.h"
 #include "abilities.h"
 #include "coop.h"
+#include "twitchplays.h"
 #include "filerw.h"
 
 #define DEATH_ANIMATION_FRAMES 70
 #define DEATH_FADE_FRAMES 20
 #define REVIVE_INVULNERABLE_FRAMES 120
+#define FAST_FALL_BONUS 0.8f   // extra downward acceleration per frame while held
 
 // Android: raylib redirects written files to internal storage,
 // but rename() doesn't know about it, so we work directly inside that folder
@@ -129,6 +131,7 @@ void UpdateGameplay(void) {
     GetGamevars()->frameCounter++;
     UpdateAbilities();
     UpdateCoop();
+    UpdateTwitchPlays();
     if (BackPressed()) {
         // Leaving a run keeps the collected coins and the highscore
         UpdateHighscore();
@@ -137,7 +140,7 @@ void UpdateGameplay(void) {
         BackToMenu();
         return;
     }
-    if (IsKeyPressed(KEY_X) || IsKeyPressed(KEY_SPACE) || PointerPressed()) {
+    if (IsKeyPressed(KEY_X) || IsKeyPressed(KEY_SPACE) || PointerPressed() || TwitchJumpTriggered()) {
         GetChicken()->velocityY = GetChicken()->jumpForce;
         GetChicken()->squash = 1.0f;
         PlayJumpSound();
@@ -152,6 +155,8 @@ void UpdateGameplay(void) {
     }
 
     GetChicken()->velocityY += GetChicken()->gravity;
+    if ((FastFallHeld() || TwitchFastFallHeld()) && GetChicken()->velocityY > 0)
+        GetChicken()->velocityY += FAST_FALL_BONUS;
     GetChicken()->pos.y += GetChicken()->velocityY;
 
     if (GetChicken()->pos.y > GetGamevars()->screenHeight - CHICKEN_SIZE) {
@@ -247,6 +252,10 @@ void UpdateMenu(void) {
         UpdateCoopMenu(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
         return;
     }
+    if (GetMenuvars()->untermenu == 3) {
+        UpdateTwitchPlaysMenu(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
+        return;
+    }
 
     if (BackPressed())
         GetMenuvars()->quit = true;   // Android back button leaves the game
@@ -272,6 +281,9 @@ void UpdateMenu(void) {
     } else if (CoopSupported() &&
                PointerPressedIn(CoopButtonRect(GetGamevars()->screenWidth, GetGamevars()->screenHeight))) {
         GetMenuvars()->untermenu = 2;
+    } else if (TwitchPlaysSupported() &&
+               PointerPressedIn(TwitchPlaysButtonRect(GetGamevars()->screenWidth, GetGamevars()->screenHeight))) {
+        GetMenuvars()->untermenu = 3;
     } else {
         for (int i = 0; i < MENU_OPTIONS; i++) {
             if (!PointerPressedIn(MenuOptionRect(i, GetGamevars()->screenWidth)))
@@ -378,11 +390,14 @@ void DrawFrame(void) {
                 LeaderboardAvailable(),
                 PlayerName(),
                 SignInState(),
-                CoopSupported());
+                CoopSupported(),
+                TwitchPlaysSupported());
         } else if (GetMenuvars()->untermenu == 1) {
             DrawShop(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
-        } else {
+        } else if (GetMenuvars()->untermenu == 2) {
             DrawCoopMenu(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
+        } else {
+            DrawTwitchPlaysMenu(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
         }
     } else {
         DrawText(TextFormat("Score: %d", GetGamevars()->score), 8, 8, 20, WHITE);

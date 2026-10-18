@@ -14,6 +14,7 @@
 #include "shared/menu.h"
 #include "shared/shop.h"
 #include "shared/coop.h"
+#include "shared/twitchplays.h"
 #include "shared/filerw.h"
 
 #if !defined(PLATFORM_ANDROID)
@@ -30,6 +31,7 @@ int main(void)
     LoadGame();
     InitAds();
     InitCoop();
+    InitTwitchPlays();
     SubmitLeaderboardScore(GetGamevars()->highscore);
     Initplayer(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
     InitSpikes(GetGamevars()->screenWidth, GetGamevars()->screenHeight);
@@ -63,6 +65,7 @@ int main(void)
 
     SaveGame();
 
+    CloseTwitchPlays();
     CloseCoop();
     CloseAds();
     CloseGameAudio();
